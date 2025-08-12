@@ -1,0 +1,12 @@
+Flask
+faster-whisper
+openai
+pydub
+google-cloud-storage
+python-dotenv
+langchain_google_vertexai
+google-cloud-aiplatform
+pandas
+openpyxl
+xlsxwriter
+streamlit

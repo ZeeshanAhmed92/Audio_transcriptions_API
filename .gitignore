@@ -1,0 +1,11 @@
+.env
+transcription
+uploads/
+lexical-ellipse-467915-j4-d0ae1b5a27bc.json
+__pycache__
+*.wav
+*.mp3
+audio_files
+audio_chunks
+.python-version
+temp_uploads/
