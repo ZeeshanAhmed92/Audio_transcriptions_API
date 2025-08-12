@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Audio Upload & Reports</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        background-color: #f8f9fa;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        color: #333;
+    }
+
+    .container {
+        margin-top: 50px;
+        background: #fff;
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+        max-width: 500px;
+        width: 100%;
+    }
+
+    h1, h2 {
+        font-weight: 500;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    input[type="file"] {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+        cursor: pointer;
+        margin-bottom: 15px;
+        width: 100%;
+    }
+
+    button {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        background: #007bff;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    button:disabled {
+        background: #c0c0c0;
+        cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) {
+        background: #0056b3;
+    }
+
+    p {
+        font-size: 14px;
+        color: #666;
+        text-align: center;
+    }
+
+    .file-list {
+        margin: 20px 0;
+        padding: 0;
+        list-style: none;
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+
+    .file-list li {
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        font-size: 14px;
+    }
+
+    .file-list li:last-child {
+        border-bottom: none;
+    }
+
+    .file-list input {
+        margin-right: 10px;
+    }
+
+    .status {
+        margin-top: 10px;
+        font-weight: 500;
+    }
+
+    .download-link a {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 8px 14px;
+        background: #28a745;
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: background 0.2s ease;
+    }
+
+    .download-link a:hover {
+        background: #1e7e34;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Upload Audio</h1>
+    <form id="uploadForm">
+        <input type="file" name="audio_file" accept="audio/*" required>
+        <button type="submit">Upload</button>
+    </form>
+    <p id="uploadResult"></p>
+
+    <h2>Uploaded Files</h2>
+    <button onclick="loadFiles()" style="margin-bottom: 10px;">Refresh List</button>
+    <ul id="fileList" class="file-list"></ul>
+
+    <button id="generateBtn" disabled>Generate Report</button>
+    <p id="status" class="status"></p>
+    <div id="downloadLink" class="download-link"></div>
+</div>
+
+<script>
+    let selectedFile = null;
+
+    document.getElementById("uploadForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        let response = await fetch("/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        let result = await response.json();
+        document.getElementById("uploadResult").innerText = result.message || result.error;
+        loadFiles();
+    });
+
+    async function loadFiles() {
+        let response = await fetch("/list_files");
+        let files = await response.json();
+
+        let list = document.getElementById("fileList");
+        list.innerHTML = "";
+        files.forEach(file => {
+            let li = document.createElement("li");
+            li.innerHTML = `<input type="radio" name="selectedFile" value="${file}"> ${file}`;
+            li.querySelector("input").addEventListener("change", () => {
+                selectedFile = file;
+                document.getElementById("generateBtn").disabled = false;
+                document.getElementById("downloadLink").innerHTML = "";
+            });
+            list.appendChild(li);
+        });
+    }
+
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+        if (!selectedFile) return;
+        document.getElementById("status").innerText = "Generating report...";
+
+        let response = await fetch("/generate_report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename: selectedFile })
+        });
+
+        let result = await response.json();
+        if (result.report_excel) {
+            document.getElementById("status").innerText = "Report generated!";
+            const encodedFilename = encodeURIComponent(result.report_excel);
+            document.getElementById("downloadLink").innerHTML =
+                `<a href="/download_report/${encodedFilename}">Download Report</a>`;
+        } else {
+            document.getElementById("status").innerText = result.error;
+        }
+    });
+
+    loadFiles();
+</script>
+</body>
+</html>
