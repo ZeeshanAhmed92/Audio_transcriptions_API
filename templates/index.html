@@ -159,22 +159,43 @@
     });
 
     async function loadFiles() {
-        let response = await fetch("/list_files");
-        let files = await response.json();
+    let response = await fetch("/list_files");
+    let files = await response.json();
 
-        let list = document.getElementById("fileList");
-        list.innerHTML = "";
-        files.forEach(file => {
-            let li = document.createElement("li");
-            li.innerHTML = `<input type="radio" name="selectedFile" value="${file}"> ${file}`;
-            li.querySelector("input").addEventListener("change", () => {
-                selectedFile = file;
-                document.getElementById("generateBtn").disabled = false;
-                document.getElementById("downloadLink").innerHTML = "";
-            });
-            list.appendChild(li);
+    let list = document.getElementById("fileList");
+    list.innerHTML = "";
+    files.forEach(file => {
+        let li = document.createElement("li");
+        li.innerHTML = `
+            <input type="radio" name="selectedFile" value="${file}">
+            ${file}
+            <span class="delete-icon" style="color:red; cursor:pointer; margin-left:8px;">&#x1F5D1;</span>
+        `;
+
+        // Radio button selection
+        li.querySelector("input[type='radio']").addEventListener("change", () => {
+            selectedFile = file;
+            document.getElementById("generateBtn").disabled = false;
+            document.getElementById("downloadLink").innerHTML = "";
         });
-    }
+
+        // Delete icon click
+        li.querySelector(".delete-icon").addEventListener("click", async () => {
+            if (confirm(`Delete ${file}?`)) {
+                let delResponse = await fetch(`/delete_file/${encodeURIComponent(file)}`, {
+                    method: "DELETE"
+                });
+                if (delResponse.ok) {
+                    loadFiles(); // refresh the list
+                } else {
+                    alert("Error deleting file");
+                }
+            }
+        });
+
+        list.appendChild(li);
+    });
+}
 
     document.getElementById("generateBtn").addEventListener("click", async () => {
         if (!selectedFile) return;
@@ -196,6 +217,7 @@
             document.getElementById("status").innerText = result.error;
         }
     });
+    
 
     loadFiles();
 </script>

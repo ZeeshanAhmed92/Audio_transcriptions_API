@@ -69,8 +69,8 @@ def generate_report_route():
 
     # Paths
     meta_path = os.path.join(TEMP_DIR, f"{filename}_meta.json")
-    transcription_path = os.path.join(TEMP_DIR, "transcription.json")
-    report_json_path = os.path.join(TEMP_DIR, "interview_report.json")
+    transcription_path = os.path.join(TEMP_DIR, f"{filename}transcription.json")
+    report_json_path = os.path.join(TEMP_DIR, f"{filename}_interview_report.json")
     report_excel_path = os.path.join(TEMP_DIR, f"{filename}_interview_report.xlsx")
 
     # Load or create metadata
@@ -166,6 +166,26 @@ def generate_report_route():
 @app.route('/download_report/<path:filename>', methods=['GET'])
 def download_report(filename):
     return send_from_directory(TEMP_DIR, filename, as_attachment=True)
+
+@app.route("/delete_file/<filename>", methods=["DELETE"])
+def delete_file(filename):
+    files = [
+        os.path.join(TEMP_DIR, f"{filename}_meta.json"),
+        os.path.join(TEMP_DIR, f"{filename}transcription.json"),
+        os.path.join(TEMP_DIR, f"{filename}_interview_report.json"),
+        os.path.join(TEMP_DIR, f"{filename}_interview_report.xlsx"),
+        os.path.join(UPLOAD_FOLDER, filename)
+        ]
+    removed = 0
+    for file in files:
+        if os.path.exists(file):
+            os.remove(file)
+            removed+=1
+        else:
+            print({file}+" doesnt exits")
+    if removed>0:
+        return "", 200
+    return "", 404
 
 if __name__ == '__main__':
     os.makedirs(GCS_FOLDER_NAME, exist_ok=True)
