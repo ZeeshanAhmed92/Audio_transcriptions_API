@@ -124,31 +124,31 @@ def generate_report_route():
         else:
             print("Skipping transcription — already done.")
 
-        # Step 3: Report Generation (skip if already done)
-        if not meta.get("report_done") or not os.path.exists(report_json_path) or not os.path.exists(report_excel_path):
-            print("Generating report...")
-            with open(transcription_path, "r", encoding="utf-8") as f:
-                transcription_json = json.load(f)
+        # # Step 3: Report Generation (skip if already done)
+        # if not meta.get("report_done") or not os.path.exists(report_json_path) or not os.path.exists(report_excel_path):
+        #     print("Generating report...")
+        #     with open(transcription_path, "r", encoding="utf-8") as f:
+        #         transcription_json = json.load(f)
 
-            report_text = generate_report(json.dumps(transcription_json))
-            report_json = clean_and_parse_json(report_text)
+        #     report_text = generate_report(json.dumps(transcription_json))
+        #     report_json = clean_and_parse_json(report_text)
 
-            if report_json:
-                os.makedirs(os.path.dirname(report_json_path), exist_ok=True)
-                with open(report_json_path, "w", encoding="utf-8") as f:
-                    json.dump(report_json, f, ensure_ascii=False, indent=4)
+        #     if report_json:
+        #         os.makedirs(os.path.dirname(report_json_path), exist_ok=True)
+        #         with open(report_json_path, "w", encoding="utf-8") as f:
+        #             json.dump(report_json, f, ensure_ascii=False, indent=4)
 
-                export_report_to_single_excel(report_json, report_excel_path)
+        #         export_report_to_single_excel(report_json, report_excel_path)
 
-                meta["report_done"] = True
-                with open(meta_path, "w") as f:
-                    json.dump(meta, f, indent=4)
+        #         meta["report_done"] = True
+        #         with open(meta_path, "w") as f:
+        #             json.dump(meta, f, indent=4)
 
-                print("Report generated.")
-            else:
-                return jsonify({"message": "Report generation failed", "filename": filename}), 500
-        else:
-            print("Skipping report generation — already done.")
+        #         print("Report generated.")
+        #     else:
+        #         return jsonify({"message": "Report generation failed", "filename": filename}), 500
+        # else:
+        #     print("Skipping report generation — already done.")
 
         return jsonify({
             "message": "Report generated successfully",

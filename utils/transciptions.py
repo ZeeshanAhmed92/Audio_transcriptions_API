@@ -41,56 +41,64 @@ def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name
 
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
-    Processes an audio file using Gemini 1.5 Pro on Vertex AI with a fixed transcription + diarization prompt.
-
-    Args:
-        project_id (str): Your Google Cloud project ID.
-        location (str): The region of your project.
-        gcs_uri (str): The GCS URI of the audio file to process.
-
-    Returns:
-        str: The generated text response from the model.
-    """
-    print("Initializing Vertex AI...")
-    vertexai.init(project=project_id, location=location)
-
-    print("Loading the Gemini 2.5 Pro model...")
-    model = GenerativeModel("gemini-2.5-pro")
-
-    prompt_for_transcription = """Transcribe from Bengali to English. Diarize the audio into speakers 
-        and assign proper labels to those speakers. 
-        Make sure you assign the sentences to the proper speaker in a way that makes logical sense. 
-        Provide output in JSON string format.
-        Example:
-        [
-            {
-                "speaker": "Interviewer",
-                "transcript": "Where is your CV? Let me see the CV."
-            },
-            {
-                "speaker": "Interviewer",
-                "transcript": "Ishak Ali?"
-            },
-            {
-                "speaker": "Candidate",
-                "transcript": "Yes, sir."
-            }
-        ]
+    Processes an audio file using Gemini 2.5 Pro on Vertex AI with a fixed transcription + diarization prompt.
+    Uses ChatVertexAI with temperature=0 for deterministic, repeatable output.
     """
 
-    # Prepare the audio part from the GCS URI
-    audio_file_part = Part.from_uri(
-        uri=gcs_uri,
-        mime_type="audio/mpeg"  # Change if needed (e.g., audio/wav)
+    # Stable, deterministic, JSON-only prompt
+    prompt_for_transcription = """
+            You are an expert transcription and translation assistant. 
+            Your task is to:
+            1. Transcribe spoken Bengali into fluent and accurate English.
+            2. Diarize the conversation by identifying distinct speakers.
+            3. Assign each sentence to the correct speaker by analyzing the context, dialogue flow, and conversational logic — not just based on alternating turns.
+            4. Maintain consistent speaker labels throughout the conversation, using 'Interviewer' and 'Candidate'.
+            5. Ensure that each transcript line makes logical sense with the preceding and following lines (e.g., questions should be assigned to Interviewer, answers to Candidate).
+            6. Keep sentences complete and avoid splitting in unnatural places.
+            7. Do not loose any content from the audio.
+
+            Think step-by-step before deciding the speaker for each line.
+
+            After completing the transcription, go through this checklist before finalizing:
+            - ✅ Have all Bengali lines been accurately translated into fluent English?
+            - ✅ Are speaker labels ('Interviewer', 'Candidate') used consistently and correctly?
+            - ✅ Does each line logically follow from the previous one in terms of who is speaking?
+            - ✅ Are there no broken or incomplete sentences?
+            - ✅ Is the JSON valid, with proper formatting and escaping of special characters?
+
+            Output ONLY a valid JSON string in the following format:
+            [
+                {
+                    "speaker": "Interviewer",
+                    "transcript": "Where is your CV? Let me see the CV."
+                },
+                {
+                    "speaker": "Interviewer",
+                    "transcript": "Ishak Ali?"
+                },
+                {
+                    "speaker": "Candidate",
+                    "transcript": "Yes, sir."
+                }
+            ]
+            """
+
+    print("Initializing ChatVertexAI with Gemini 2.5 Pro...")
+    llm = ChatVertexAI(
+        model="gemini-2.5-pro",
+        temperature=0.2,
+        project=project_id,
+        location=location,
+        response_mime_type="application/json"  # Forces JSON mode if supported
     )
-
-    # Request content includes both the prompt and audio
-    request_content = [prompt_for_transcription, audio_file_part]
 
     print("Sending request to Gemini model... (This may take a moment)")
     try:
-        response = model.generate_content(request_content)
-        return response.text
+        result = llm.invoke([
+            SystemMessage(content=prompt_for_transcription),
+            HumanMessage(content=f"Transcribe and diarize the audio at: {gcs_uri}")
+        ])
+        return result.content
     except Exception as e:
         return f"An error occurred: {e}"
 
