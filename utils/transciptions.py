@@ -2,105 +2,179 @@ import os
 import re
 import json 
 import vertexai
+import math
 import pandas as pd
-import streamlit as st
+from pydub import AudioSegment
 from google.cloud import storage
 from langchain_google_vertexai import ChatVertexAI
 from vertexai.generative_models import GenerativeModel, Part
 from langchain_core.messages import SystemMessage, HumanMessage
 
-def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name: str) -> str:
-    """
-    Uploads a file to the specified GCS bucket.
 
+def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000):
+    """
+    Splits the audio file into chunks of specified length.
+    
     Args:
-        bucket_name (str): The name of the GCS bucket.
-        source_file_path (str): The path to the local file to upload.
-        destination_blob_name (str): The desired name of the file in the GCS bucket.
+        file_path (str): Path to the input audio file.
+        chunk_length_ms (int): Length of each chunk in milliseconds (default 10 min).
 
     Returns:
-        str: The GCS URI of the uploaded file (e.g., "gs://bucket-name/file-name").
+        List[str]: List of paths to the chunked audio files.
     """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    audio = AudioSegment.from_file(file_path)
+    audio_length = len(audio)
+    
+    # If audio is shorter than the chunk size, return as-is
+    if audio_length <= chunk_length_ms:
+        return [file_path]
+
+    chunks = []
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    ext = os.path.splitext(file_path)[1]
+
+    for i in range(0, len(audio), chunk_length_ms):
+        chunk = audio[i:i + chunk_length_ms]
+        chunk_filename = f"{base_name}_part{i//chunk_length_ms + 1}{ext}"
+        chunk_path = os.path.join(os.path.dirname(file_path), chunk_filename)
+        chunk.export(chunk_path, format=ext.replace('.', ''))
+        chunks.append(chunk_path)
+
+    return chunks
+
+def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name: str) -> str:
     if not os.path.exists(source_file_path):
         raise FileNotFoundError(f"The file {source_file_path} was not found.")
 
     print(f"Uploading '{source_file_path}' to bucket '{bucket_name}'...")
-    
-    # Initialize the GCS client
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
-
-    # Upload the file
     blob.upload_from_filename(source_file_path)
-
     gcs_uri = f"gs://{bucket_name}/{destination_blob_name}"
-    print(f"File uploaded successfully. GCS URI: {gcs_uri}")
+    print(f"File uploaded successfully: {gcs_uri}")
     return gcs_uri
 
+def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str) -> list:
+    """
+    Splits the audio into 10-min chunks, uploads each to GCS, and returns their URIs.
+    """
+    chunk_files = split_audio(source_file_path)
+    gcs_uris = []
+
+    for chunk_file in chunk_files:
+        chunk_name = os.path.basename(chunk_file)
+        gcs_path = f"{gcs_folder}/{chunk_name}"
+        uri = upload_to_gcs(bucket_name, chunk_file, gcs_path)
+        gcs_uris.append(uri)
+
+    return gcs_uris
+
+
+# def process_audio_with_gemini(project_id, location, gcs_uri):
+#     """
+#     Processes an audio file using Gemini 2.5 Pro on Vertex AI with a fixed transcription + diarization prompt.
+#     Uses ChatVertexAI with temperature=0 for deterministic, repeatable output.
+#     """
+
+#     # Stable, deterministic, JSON-only prompt
+    # prompt_for_transcription = """
+    #         You are an expert transcription and translation assistant. 
+    #         Your task is to:
+    #         1. Transcribe spoken Bengali into fluent and accurate English.
+    #         2. Diarize the conversation by identifying distinct speakers.
+    #         3. Assign each sentence to the correct speaker by analyzing the context, dialogue flow, and conversational logic — not just based on alternating turns.
+    #         4. Maintain consistent speaker labels throughout the conversation, using 'Interviewer' and 'Candidate'.
+    #         5. Ensure that each transcript line makes logical sense with the preceding and following lines (e.g., questions should be assigned to Interviewer, answers to Candidate).
+    #         6. Keep sentences complete and avoid splitting in unnatural places.
+    #         7. Do not loose any content from the audio.
+
+    #         Think step-by-step before deciding the speaker for each line.
+
+    #         After completing the transcription, go through this checklist before finalizing:
+    #         - ✅ Have all Bengali lines been accurately translated into fluent English?
+    #         - ✅ Are speaker labels ('Interviewer', 'Candidate') used consistently and correctly?
+    #         - ✅ Does each line logically follow from the previous one in terms of who is speaking?
+    #         - ✅ Are there no broken or incomplete sentences?
+    #         - ✅ Is the JSON valid, with proper formatting and escaping of special characters?
+
+    #         Output ONLY a valid JSON string in the following format:
+    #         [
+    #             {
+    #                 "speaker": "Interviewer",
+    #                 "transcript": "Where is your CV? Let me see the CV."
+    #             },
+    #             {
+    #                 "speaker": "Interviewer",
+    #                 "transcript": "Ishak Ali?"
+    #             },
+    #             {
+    #                 "speaker": "Candidate",
+    #                 "transcript": "Yes, sir."
+    #             }
+    #         ]
+    #         """
+
+#     print("Initializing ChatVertexAI with Gemini 2.5 Pro...")
+#     llm = ChatVertexAI(
+#         model="gemini-2.5-pro",
+#         temperature=0.4,
+#         project=project_id,
+#         location=location
+#     )
+
+#     print("Sending request to Gemini model... (This may take a moment)")
+#     try:
+#         result = llm.invoke([
+#             SystemMessage(content=prompt_for_transcription),
+#             HumanMessage(content=f"Transcribe and diarize the audio at: {gcs_uri}")
+#         ])
+#         return result.content
+#     except Exception as e:
+#         return f"An error occurred: {e}"
 
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
-    Processes an audio file using Gemini 2.5 Pro on Vertex AI with a fixed transcription + diarization prompt.
-    Uses ChatVertexAI with temperature=0 for deterministic, repeatable output.
+    Processes a Bengali audio file using Gemini 2.5 Pro for transcription + diarization + translation.
+    Returns raw model output (expected JSON string).
+    """
+    print("Initializing Vertex AI...")
+    vertexai.init(project=project_id, location=location)
+
+    model = GenerativeModel("gemini-2.5-pro")
+
+    prompt_for_transcription = """
+    You are an expert transcription and translation assistant.
+    Your task is to:
+    1. Transcribe spoken Bengali into fluent and accurate English.
+    2. Diarize and Identify speakers based on context and assign meaningful role labels (e.g., "Interviewer" and "Candidate", "Salesman" and "Shopkeeper").
+    3. Assign sentences logically to the correct speaker.
+    4. Keep sentences complete and do not lose content.
+    Output ONLY a valid JSON array, nothing else.
+    Format:
+    [
+        {"speaker": "Interviewer", "transcript": "Sample text"},
+        {"speaker": "Candidate", "transcript": "Sample text"}
+    ]
     """
 
-    # Stable, deterministic, JSON-only prompt
-    prompt_for_transcription = """
-            You are an expert transcription and translation assistant. 
-            Your task is to:
-            1. Transcribe spoken Bengali into fluent and accurate English.
-            2. Diarize the conversation by identifying distinct speakers.
-            3. Assign each sentence to the correct speaker by analyzing the context, dialogue flow, and conversational logic — not just based on alternating turns.
-            4. Maintain consistent speaker labels throughout the conversation, using 'Interviewer' and 'Candidate'.
-            5. Ensure that each transcript line makes logical sense with the preceding and following lines (e.g., questions should be assigned to Interviewer, answers to Candidate).
-            6. Keep sentences complete and avoid splitting in unnatural places.
-            7. Do not loose any content from the audio.
-
-            Think step-by-step before deciding the speaker for each line.
-
-            After completing the transcription, go through this checklist before finalizing:
-            - ✅ Have all Bengali lines been accurately translated into fluent English?
-            - ✅ Are speaker labels ('Interviewer', 'Candidate') used consistently and correctly?
-            - ✅ Does each line logically follow from the previous one in terms of who is speaking?
-            - ✅ Are there no broken or incomplete sentences?
-            - ✅ Is the JSON valid, with proper formatting and escaping of special characters?
-
-            Output ONLY a valid JSON string in the following format:
-            [
-                {
-                    "speaker": "Interviewer",
-                    "transcript": "Where is your CV? Let me see the CV."
-                },
-                {
-                    "speaker": "Interviewer",
-                    "transcript": "Ishak Ali?"
-                },
-                {
-                    "speaker": "Candidate",
-                    "transcript": "Yes, sir."
-                }
-            ]
-            """
-
-    print("Initializing ChatVertexAI with Gemini 2.5 Pro...")
-    llm = ChatVertexAI(
-        model="gemini-2.5-pro",
-        temperature=0.2,
-        project=project_id,
-        location=location,
-        response_mime_type="application/json"  # Forces JSON mode if supported
-    )
+    audio_file_part = Part.from_uri(uri=gcs_uri, mime_type="audio/mpeg")
 
     print("Sending request to Gemini model... (This may take a moment)")
     try:
-        result = llm.invoke([
-            SystemMessage(content=prompt_for_transcription),
-            HumanMessage(content=f"Transcribe and diarize the audio at: {gcs_uri}")
-        ])
-        return result.content
+        response = model.generate_content([prompt_for_transcription, audio_file_part])
+        if not getattr(response, "text", None) or not response.text.strip():
+            print("⚠ Gemini returned empty output")
+            return None
+
+        return response.text.strip()
+
     except Exception as e:
-        return f"An error occurred: {e}"
+        print(f"❌ Error during Gemini request: {e}")
+        return None
 
 
 def generate_report(transcription):
@@ -135,7 +209,7 @@ Fill the questionnaire in light of the provided transcript, strictly following t
 
 STRICT OUTPUT RULES:
 - Use only the questionnaire that best matches the subject matter of the provided transcript.
-- Include all 31 main questions from the questionnaire in the report, in the same order, without omission.
+- Include all 34 main questions from the questionnaire in the report, in the same order, without omission.
 - Also identify and document any extra questions that were asked but are not in the questionnaire.
 - Output must be valid JSON loadable directly in Python without any modifications.
 """
@@ -226,20 +300,24 @@ Example JSON structure:
    "recommendations": "...",
    "average_score": 0.78
 }},
-"candidate_feedback":  
-       - "average_score"`: Average candidate score across all predefined questions.  
-       - "response_quality_summary"`: Brief assessment of overall response quality.  
-       - "recommendations"`: Suggestions for improvement.  
-       - "personality_assessment"`: An object containing the following keys, each with a boolean value and a short justification **based only on evidence from the transcript**:  
-         {{
-            "positivity": {{ "value": true, "reason": "Candidate remained optimistic even when discussing past challenges." }},
-            "honesty": {{ "value": true, "reason": "Candidate openly admitted to lacking experience in one area." }},
-            "humility": {{ "value": true, "reason": "Candidate credited team members for successes." }},
-            "desire_to_work": {{ "value": true, "reason": "Candidate expressed strong interest in joining the company." }},
-            "discipline": {{ "value": true, "reason": "Candidate described consistent work habits." }},
-            "job_understanding": {{ "value": true, "reason": "Candidate accurately described the role's key responsibilities." }},
-            "right_person_for_job": {{ "value": true, "reason": "Overall responses align with role requirements." }}
-         }}
+"candidate_feedback":
+    - "average_score": Average candidate score across all predefined questions.
+    - "response_quality_summary": Brief assessment of overall response quality.
+    - "recommendations": Suggestions for improvement.
+    - "personality_assessment": {{
+    "Right Person": {{
+        "Positivity": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
+        "Cheerfulness/Energy": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
+        "Willingness to learn": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
+        "Honesty": {{{{ "value": True/false, "reason": "<evidence from transcript>" }}}},
+        "Determination/Perseverance": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}}
+    }},
+    "Right Seat": {{
+        "Understands the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
+        "Wants to do the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
+        "Has the ability to do the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}}
+    }}
+}}
     ]
     }}
        
@@ -260,27 +338,31 @@ Example JSON structure:
 
 
 def clean_and_parse_json(raw_text):
-    # Use a regex to find the content inside a JSON markdown block
-    json_match = re.search(r'```json\n(.*?)\n```', raw_text, re.DOTALL)
-    
+    if not raw_text or not raw_text.strip():
+        print("⚠ No text provided to parse")
+        return None
+
+    # Try fenced code block first
+    json_match = re.search(r'```json\s*(.*?)\s*```', raw_text, re.DOTALL)
     if json_match:
         raw_json_str = json_match.group(1).strip()
     else:
-        # If no markdown block is found, assume the entire text is the JSON
-        raw_json_str = raw_text.strip()
-    
-    # Remove trailing commas that might cause parsing errors
+        # Try extracting the first {...} or [...] JSON-like structure
+        json_match = re.search(r'(\{.*\}|\[.*\])', raw_text, re.DOTALL)
+        raw_json_str = json_match.group(1).strip() if json_match else raw_text.strip()
+
+    # Remove trailing commas
     raw_json_str = re.sub(r',\s*\]', ']', raw_json_str)
     raw_json_str = re.sub(r',\s*\}', '}', raw_json_str)
 
     try:
         return json.loads(raw_json_str)
     except json.JSONDecodeError as e:
-        st.error(f"❌ Failed to parse JSON. Error: {e}")
-        st.write("--- Raw Model Output ---")
-        st.code(raw_text) # Display the raw output for debugging
-        st.write("--- Attempted to parse: ---")
-        st.code(raw_json_str)
+        print(f"❌ Failed to parse JSON. Error: {e}")
+        print("--- Raw text received ---")
+        print(raw_text)
+        print("--- Extracted JSON string ---")
+        print(raw_json_str)
         return None
     
 
@@ -303,13 +385,16 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
         ("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])),
     ]
 
-    # Candidate Feedback — flatten personality_assessment
+    # Candidate Feedback — flatten nested Right Person / Right Seat
     candidate_feedback = data.get("candidate_feedback", {})
     personality = candidate_feedback.get("personality_assessment", {})
+
     flat_personality = {}
-    for trait, detail in personality.items():
-        flat_personality[f"{trait}_value"] = detail.get("value")
-        flat_personality[f"{trait}_reason"] = detail.get("reason")
+    for group, traits in personality.items():  # group = "Right Person" / "Right Seat"
+        for trait, detail in traits.items():
+            col_prefix = f"{group}_{trait}".replace(" ", "_")
+            flat_personality[f"{col_prefix}_value"] = detail.get("value")
+            flat_personality[f"{col_prefix}_reason"] = detail.get("reason")
     candidate_df = pd.DataFrame([{**candidate_feedback, **flat_personality}])
     candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
     blocks.append(("Candidate Feedback", candidate_df))
