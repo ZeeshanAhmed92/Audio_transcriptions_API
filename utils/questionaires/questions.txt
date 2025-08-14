@@ -1,13 +1,16 @@
 "Tell me about yourself and your family background",
 "Why did you choose a career in sales? What are your goals and aspirations in this profession?",
 "What motivates you to work for our company?",
+"How necessary is this job for you? Who are the main earning members in your family, and how dependent is your family on each earning member?",
+"Can you explain the process you’ve been following in your current or previous role? And how do you think you’ll fit in with our company’s systems and policies?",
+"If you were working as an SR in a completely new area with new routes, how would you build the market there? When starting in a new area, what would your plan be to succeed?"
 "This role involves walking long routes and engaging with shopkeepers who may have differing views. How comfortable are you with that?",
 "Do you understand the responsibilities of a Sales Representative? Are you genuinely interested in this role?",
 "What qualities do you believe make an ideal Sales Representative?",
 "How would you handle a situation where a shopkeeper is not interested in purchasing your products?",
 "Describe what your daily routine would look like as a Sales Representative.",
 "What traits do you value most in an ideal sales call?",
-"What qualities do you possess that would make me recommend you as a suitable ‘green’ (100% target achieving) sales representative for Bombay Sweets?, *****
+"What qualities do you possess that would make me recommend you as a suitable ‘green’ (100% target achieving) sales representative for Bombay Sweets?, 
 "Why do you believe you would stay with our company for the long term? Tell me why we should believe this?", 
 "Please describe your previous work experience.",
 "Why did you choose sales as a profession? What are your personal and professional objectives?",

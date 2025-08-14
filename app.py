@@ -3,8 +3,10 @@ import os
 import time
 import json
 from dotenv import load_dotenv
-from utils.transciptions import (upload_to_gcs,process_audio_with_gemini,generate_report,
-                                 clean_and_parse_json,export_report_to_single_excel)
+from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload, 
+                                 export_report_to_single_excel)
+
+
 load_dotenv()
 os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 app = Flask(__name__)
@@ -14,14 +16,12 @@ UPLOAD_FOLDER = 'uploads'
 REPORT_FOLDER = 'reports'
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  
 LOCATION = "us-central1"        
-GCS_BUCKET_NAME = "bengali-transcription-bucket" 
+GCS_BUCKET_NAME = "bengali-transcription-bucket"    
 TEMP_DIR = "temp_uploads"
 GCS_FOLDER_NAME = "Interview_audios"  
 
 # openai.api_key = os.getenv("OPENAI_API_KEY")
 os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-
-
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
@@ -87,34 +87,45 @@ def generate_report_route():
     try:
         # Step 1: Upload to GCS (skip if already done)
         if not meta.get("gcs_uri"):
+
             print("Uploading to GCS...")
             destination_blob_name = f"{GCS_FOLDER_NAME}/{filename}"
+
             source_file_path = os.path.join(UPLOAD_FOLDER, filename)
-            gcs_uri = upload_to_gcs(
+            gcs_uris = split_and_upload(
                 GCS_BUCKET_NAME,
                 source_file_path,
                 destination_blob_name
             )
-            meta["gcs_uri"] = gcs_uri
+
+            meta["gcs_uri"] = gcs_uris
             with open(meta_path, "w") as f:
                 json.dump(meta, f, indent=4)
-            print("File uploaded to GCS:", gcs_uri)
+            print("File uploaded to GCS:", gcs_uris)
         else:
             print("Skipping GCS upload — already done:", meta["gcs_uri"])
 
         # Step 2: Transcription (skip if already done)
         if not meta.get("transcription_done") or not os.path.exists(transcription_path):
             print("Transcribing audio...")
-            raw_transcription = process_audio_with_gemini(
-                PROJECT_ID,
-                LOCATION,
-                meta["gcs_uri"]
-            )
-            transcription_json = clean_and_parse_json(raw_transcription)
-            if transcription_json:
+
+            all_transcriptions = []
+            for uri in meta["gcs_uri"]:
+                raw_transcription = process_audio_with_gemini(
+                    PROJECT_ID,
+                    LOCATION,
+                    uri
+                )
+                chunk_transcription = clean_and_parse_json(raw_transcription)
+                if chunk_transcription:
+                    all_transcriptions.extend(chunk_transcription)
+                else:
+                    print(f"Warning: No transcription for {uri}")
+            
+            if all_transcriptions:
                 os.makedirs(os.path.dirname(transcription_path), exist_ok=True)
                 with open(transcription_path, "w", encoding="utf-8") as f:
-                    json.dump(transcription_json, f, ensure_ascii=False, indent=4)
+                    json.dump(all_transcriptions, f, ensure_ascii=False, indent=4)
                 meta["transcription_done"] = True
                 with open(meta_path, "w") as f:
                     json.dump(meta, f, indent=4)
@@ -124,31 +135,31 @@ def generate_report_route():
         else:
             print("Skipping transcription — already done.")
 
-        # # Step 3: Report Generation (skip if already done)
-        # if not meta.get("report_done") or not os.path.exists(report_json_path) or not os.path.exists(report_excel_path):
-        #     print("Generating report...")
-        #     with open(transcription_path, "r", encoding="utf-8") as f:
-        #         transcription_json = json.load(f)
+        # Step 3: Report Generation (skip if already done)
+        if not meta.get("report_done") or not os.path.exists(report_json_path) or not os.path.exists(report_excel_path):
+            print("Generating report...")
+            with open(transcription_path, "r", encoding="utf-8") as f:
+                transcription_json = json.load(f)
 
-        #     report_text = generate_report(json.dumps(transcription_json))
-        #     report_json = clean_and_parse_json(report_text)
+            report_text = generate_report(json.dumps(transcription_json))
+            report_json = clean_and_parse_json(report_text)
 
-        #     if report_json:
-        #         os.makedirs(os.path.dirname(report_json_path), exist_ok=True)
-        #         with open(report_json_path, "w", encoding="utf-8") as f:
-        #             json.dump(report_json, f, ensure_ascii=False, indent=4)
+            if report_json:
+                os.makedirs(os.path.dirname(report_json_path), exist_ok=True)
+                with open(report_json_path, "w", encoding="utf-8") as f:
+                    json.dump(report_json, f, ensure_ascii=False, indent=4)
 
-        #         export_report_to_single_excel(report_json, report_excel_path)
+                export_report_to_single_excel(report_json, report_excel_path)
 
-        #         meta["report_done"] = True
-        #         with open(meta_path, "w") as f:
-        #             json.dump(meta, f, indent=4)
+                meta["report_done"] = True
+                with open(meta_path, "w") as f:
+                    json.dump(meta, f, indent=4)
 
-        #         print("Report generated.")
-        #     else:
-        #         return jsonify({"message": "Report generation failed", "filename": filename}), 500
-        # else:
-        #     print("Skipping report generation — already done.")
+                print("Report generated.")
+            else:
+                return jsonify({"message": "Report generation failed", "filename": filename}), 500
+        else:
+            print("Skipping report generation — already done.")
 
         return jsonify({
             "message": "Report generated successfully",
