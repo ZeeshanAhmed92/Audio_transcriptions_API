@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Audio Upload & Reports - Job {{ job_id }}</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        background-color: #0e0e0e;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        color: #fff;
+    }
+    .container {
+        margin-top: 50px;
+        background-color: #1a1a1a;
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.6);
+        max-width: 700px;
+        width: 100%;
+    }
+    h1, h2 {
+        font-weight: 500;
+        margin-bottom: 20px;
+        text-align: center;
+        color: #fff;
+    }
+    form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    input[type="file"] {
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        background-color: #262626;
+        cursor: pointer;
+        margin-bottom: 15px;
+        width: 100%;
+        color: #fff;
+    }
+    input[type="file"]::file-selector-button {
+        background-color: #0066ff;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    input[type="file"]::file-selector-button:hover {
+        background-color: #0052cc;
+    }
+    button {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 8px;
+        background-color: #0066ff;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    button:disabled {
+        background: #555;
+        cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+        background-color: #0052cc;
+    }
+    #logoutBtn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: #ff3333;
+    }
+    #logoutBtn:hover {
+        background-color: #cc2929;
+    }
+    #refreshBtn {
+        margin-bottom: 10px;
+    }
+    .file-list {
+        margin: 20px 0;
+        padding: 0;
+        list-style: none;
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background-color: #262626;
+    }
+    .file-list li {
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #333;
+        font-size: 14px;
+        color: #fff;
+    }
+    .file-list li:last-child {
+        border-bottom: none;
+    }
+    .status {
+        font-size: 14px;
+        color: #bbb;
+        margin-left: 10px;
+        display: flex;
+        align-items: center;
+    }
+    .status .spinner {
+        border: 2px solid #444;
+        border-top: 2px solid #0066ff;
+        border-radius: 50%;
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .download-link a {
+        margin-left: 10px;
+        padding: 4px 8px;
+        background: #28a745;
+        color: white;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 12px;
+    }
+    .download-link a:hover {
+        background: #1e7e34;
+    }
+    .delete-btn {
+        background-color: #ff3333 !important;
+    }
+    .delete-btn:hover {
+        background-color: #cc2929 !important;
+    }
+    #generateSelectedBtn, #mergedReportBtn {
+        margin-top: 10px;
+        width: 100%;
+    }
+    .questionnaire-dropdown {
+        margin-left: 8px;
+        padding: 4px;
+        background-color: #1a1a1a;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 6px;
+    }
+</style>
+</head>
+<body>
+<button id="logoutBtn">Logout</button>
+<div class="container">
+<h1>Upload Audio</h1>
+<form id="uploadForm">
+<input type="file" name="audio_file" accept="audio/*" required>
+<button type="submit">Upload</button>
+</form>
+<p id="uploadResult"></p>
+
+<h2>Uploaded Files</h2>
+<button id="refreshBtn">Refresh List</button>
+<ul id="fileList" class="file-list"></ul>
+<button id="generateSelectedBtn" disabled>Generate Selected</button>
+<button id="mergedReportBtn" disabled>Get Merged Report</button>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const jobId = "{{ job_id }}";
+    const POLL_INTERVAL = 2000;
+    let fileJobs = {};
+    let questionnaires = [];
+    let fileStatuses = {};
+
+    const logoutBtn = document.getElementById("logoutBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const generateSelectedBtn = document.getElementById("generateSelectedBtn");
+    const mergedReportBtn = document.getElementById("mergedReportBtn");
+
+    async function fetchQuestionnaires() {
+        const res = await fetch("/get_questions", { credentials: "same-origin" });
+        questionnaires = await res.json();
+    }
+
+    logoutBtn.addEventListener("click", async () => {
+        await fetch("/logout",{method:"POST", credentials:"same-origin"});
+        window.location.href="/";
+    });
+
+    document.getElementById("uploadForm").addEventListener("submit", async function(e){
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch(`/upload/${jobId}`, { method:"POST", body:formData, credentials:"same-origin" });
+        const data = await res.json();
+        document.getElementById("uploadResult").innerText = data.message || data.error;
+        loadFiles();
+    });
+
+    refreshBtn.addEventListener("click", loadFiles);
+
+    generateSelectedBtn.addEventListener("click", async () => {
+        const checkboxes = document.querySelectorAll(".file-checkbox:checked");
+        for(const cb of checkboxes) {
+            const selectedQ = document.getElementById(`q-${cb.value}`).value;
+            await initiateJob(cb.value, selectedQ);
+        }
+    });
+
+    mergedReportBtn.addEventListener("click", async () => {
+    const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+
+    try {
+        const res = await fetch("/merged_report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId, filenames: selectedFiles }),
+        credentials: "same-origin"
+        });
+
+        if (!res.ok) {
+        // Try to read error message if server sent JSON
+        let msg = "Failed to generate merged report";
+        try { const j = await res.json(); if (j.error || j.msg) msg = j.error || j.msg; } catch {}
+        throw new Error(msg);
+        }
+
+        // Get filename from Content-Disposition if present
+        const disp = res.headers.get("Content-Disposition");
+        let filename = `merged_job_${jobId}.xlsx`;
+        const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+        if (m) filename = decodeURIComponent(m[1]);
+
+        // Download blob
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert(e.message || "Failed to generate merged report");
+    }
+    });
+
+    function updateButtonStates(){
+        const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
+        const statuses = checkboxes.map(cb => fileStatuses[cb.value] || "Idle");
+
+        generateSelectedBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Idle" || s === "Done"));
+        mergedReportBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Done"));
+    }
+
+    async function loadFiles(){
+        const res = await fetch(`/list_files/${jobId}`, { credentials:"same-origin" });
+        const files = await res.json();
+        const list = document.getElementById("fileList");
+        list.innerHTML = "";
+
+        files.forEach(file => {
+            const li = document.createElement("li");
+
+            let qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
+
+            li.innerHTML = `
+                <div>
+                    <input type="checkbox" class="file-checkbox" value="${file}"> ${file}
+                    <select class="questionnaire-dropdown" id="q-${file}">
+                        ${qOptions}
+                    </select>
+                    <span class="status" id="status-${file}">Idle</span>
+                </div>
+                <div>
+                    <button class="generate-btn" data-file="${file}">Generate</button>
+                    <span class="download-link" id="download-${file}"></span>
+                    <button class="delete-btn" data-file="${file}">Delete</button>
+                </div>
+            `;
+
+            li.querySelector(".file-checkbox").addEventListener("change", updateButtonStates);
+
+            li.querySelector(".generate-btn").addEventListener("click", async ()=>{ 
+                const selectedQ = document.getElementById(`q-${file}`).value;
+                await initiateJob(file, selectedQ); 
+            });
+            li.querySelector(".delete-btn").addEventListener("click", async ()=> {
+                if(confirm(`Delete ${file}?`)){
+                    const del = await fetch(`/delete_file/${jobId}/${encodeURIComponent(file)}`, {method:"DELETE", credentials:"same-origin"});
+                    if(del.ok) loadFiles(); else alert("Error deleting file");
+                }
+            });
+
+            list.appendChild(li);
+        });
+
+        await updateFileStatuses();
+        pollJobStatuses();
+    }
+
+    async function initiateJob(file, questionnaire){
+        const statusEl = document.getElementById(`status-${file}`);
+        statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
+        const res = await fetch("/generate_report", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({ filename:file, job_id:jobId, questionnaire: questionnaire }),
+            credentials:"same-origin"
+        });
+        const data = await res.json();
+        if(data.job_id) fileJobs[file] = data.job_id;
+        else statusEl.innerText = data.error || "Failed";
+        updateButtonStates();
+    }
+
+    async function updateFileStatuses(){
+        const res = await fetch("/all_jobs_status", { credentials:"same-origin" });
+        const allJobs = await res.json();
+
+        document.querySelectorAll(".file-checkbox").forEach(fileEl=>{
+            const filename = fileEl.value;
+            const statusEl = document.getElementById(`status-${filename}`);
+            const downloadEl = document.getElementById(`download-${filename}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
+
+            const matchingJob = Object.entries(allJobs).find(([jid, job])=>job.file===filename);
+            if(matchingJob){
+                const [job_id, jobData] = matchingJob;
+                fileJobs[filename] = job_id;
+
+                if(jobData.status === "done" && jobData.report_excel){
+                    statusEl.innerHTML = "Done";
+                    fileStatuses[filename] = "Done";
+                    generateBtn.disabled = false;
+                    downloadEl.innerHTML = `<a href="/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}">Download</a>`;
+                    delete fileJobs[filename];
+                } else if(jobData.status === "error"){
+                    statusEl.innerHTML = "Error: " + (jobData.error || "Failed");
+                    fileStatuses[filename] = "Error";
+                    generateBtn.disabled = false;
+                    downloadEl.innerHTML = "";
+                    delete fileJobs[filename];
+                } else {
+                    statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
+                    fileStatuses[filename] = jobData.status;
+                    generateBtn.disabled = true; // Disable if not Idle/Done
+                    downloadEl.innerHTML = "";   // Hide download link
+                }
+            } else {
+                statusEl.innerHTML = "Idle";
+                fileStatuses[filename] = "Idle";
+                generateBtn.disabled = false;
+                downloadEl.innerHTML = "";
+            }
+        });
+
+        updateButtonStates();
+    }
+
+    async function pollJobStatuses(){
+        await updateFileStatuses();
+        setTimeout(pollJobStatuses, POLL_INTERVAL);
+    }
+
+    (async function init(){
+        await fetchQuestionnaires();
+        loadFiles();
+    })();
+});
+</script>
+</body>
+</html>
