@@ -35,11 +35,13 @@ def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000):
     chunks = []
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     ext = os.path.splitext(file_path)[1]
+    chunks_dir = os.path.join(os.path.dirname(file_path), "chunks")
+    os.makedirs(chunks_dir, exist_ok=True)
 
     for i in range(0, len(audio), chunk_length_ms):
         chunk = audio[i:i + chunk_length_ms]
         chunk_filename = f"{base_name}_part{i//chunk_length_ms + 1}{ext}"
-        chunk_path = os.path.join(os.path.dirname(file_path), chunk_filename)
+        chunk_path = os.path.join(chunks_dir, chunk_filename)
         chunk.export(chunk_path, format=ext.replace('.', ''))
         chunks.append(chunk_path)
 
@@ -177,7 +179,7 @@ def process_audio_with_gemini(project_id, location, gcs_uri):
         return None
 
 
-def generate_report(transcription):
+def generate_report(transcription,questionaire):
     """
     Generates a structured JSON interview report from a Bengali transcript using Gemini 1.5/2.5 Pro via ChatVertexAI (LangChain),
     based on a provided questionnaire and sample report format.
@@ -192,7 +194,7 @@ def generate_report(transcription):
 
     # Use an absolute path to the 'questions.txt' file
     script_dir = os.path.dirname(__file__)
-    questions_file_path = os.path.join(script_dir, 'questionaires', 'questions.txt')
+    questions_file_path = os.path.join(script_dir, 'questionaires', questionaire)
 
     with open(questions_file_path, 'r', encoding='utf-8') as file:
         questions = file.read()
