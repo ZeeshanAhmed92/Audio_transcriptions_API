@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload, 
                                  export_report_to_single_excel)
 import shutil
-
-
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, PatternFill, Border, Alignment, Protection
+import copy
 
 load_dotenv()
 os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -446,6 +447,7 @@ def index():
 
 
 
+
 @app.route('/merged_report', methods=['POST'])
 @jwt_required()
 def merge_reports():
@@ -456,12 +458,15 @@ def merge_reports():
     if not job_id or not files:
         return jsonify({"msg": "job_id and files are required"}), 400
 
-    # Job reports folder
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
     if not os.path.exists(job_report_folder):
         return jsonify({"msg": f"Job {job_id} report folder not found"}), 404
 
-    merged_df = pd.DataFrame()
+    merged_wb = Workbook()
+    merged_ws = merged_wb.active
+    merged_ws.title = "Merged Report"
+
+    current_row = 1
 
     for filename in files:
         report_path = os.path.join(job_report_folder, f"{filename}_interview_report.xlsx")
@@ -469,14 +474,37 @@ def merge_reports():
             return jsonify({"msg": f"Report not found for {filename}"}), 404
         
         try:
-            df = pd.read_excel(report_path)
-            merged_df = pd.concat([merged_df, df], ignore_index=True)
+            wb = load_workbook(report_path)
+            ws = wb.active
+
+            # Header for each file section
+            merged_ws.cell(row=current_row, column=1, value=f"Report for {filename}")
+            merged_ws.cell(row=current_row, column=1).font = Font(bold=True)
+            current_row += 1
+
+            # Copy cells with formatting
+            for row in ws.iter_rows():
+                for col_index, cell in enumerate(row, start=1):
+                    new_cell = merged_ws.cell(row=current_row, column=col_index, value=cell.value)
+                    
+                    if cell.has_style:
+                        new_cell.font = copy.copy(cell.font)
+                        new_cell.fill = copy.copy(cell.fill)
+                        new_cell.border = copy.copy(cell.border)
+                        new_cell.alignment = copy.copy(cell.alignment)
+                        new_cell.number_format = cell.number_format
+                        new_cell.protection = copy.copy(cell.protection)
+
+                current_row += 1
+            
+            # Blank row between reports
+            current_row += 1
+
         except Exception as e:
             return jsonify({"msg": f"Error reading {report_path}: {str(e)}"}), 500
 
-    # Save merged file
     merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
-    merged_df.to_excel(merged_path, index=False)
+    merged_wb.save(merged_path)
 
     return send_file(merged_path, as_attachment=True)
 
