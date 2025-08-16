@@ -196,25 +196,15 @@ def generate_report(transcription,questionaire):
     script_dir = os.path.dirname(__file__)
     questions_file_path = os.path.join(script_dir, 'questionaires', questionaire)
 
-    with open(questions_file_path, 'r', encoding='utf-8') as file:
-        questions = file.read()
-
+    with open(questions_file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    questions = data["questions"]
+    prompt = data["report_prompt"]
+    system_prompt = data["auditor_system_prompt"]
     messages = [
         SystemMessage(
             content=(
-                """You are a professional Auditor. You will be given:
-1. A conversational transcript of an interview.
-2. A set of predefined questionnaire questions.
-
-Your job:
-Fill the questionnaire in light of the provided transcript, strictly following the given format and scoring rules.
-
-STRICT OUTPUT RULES:
-- Use only the questionnaire that best matches the subject matter of the provided transcript.
-- Include all 34 main questions from the questionnaire in the report, in the same order, without omission.
-- Also identify and document any extra questions that were asked but are not in the questionnaire.
-- Output must be valid JSON loadable directly in Python without any modifications.
-"""
+                system_prompt
             )
         ),
         HumanMessage(
@@ -227,101 +217,8 @@ Conversational Transcript:
 \"\"\"
 {transcription}
 \"\"\"
-
-INSTRUCTIONS FOR REPORT GENERATION:
-1. **Output Format**  
-   - JSON array of objects, where each object represents one question (see Example below).
-   - Each object must have:  
-     `id`, `Competency`, `Predefined_Question`, `Question_asked`, `Question_Quality`, `Response`, `Summary`,  
-     `Response_Quality`, `Question_score`, `Response_score`.
-
-2. **Scoring Rules**  
-   - Question_score:  
-     1 = fully aligned with predefined question,  
-     0.5 = partially aligned,  
-     0 = not aligned at all.  
-   - Response_score:  
-     1 = fully answered,  
-     0.5 = partially answered,  
-     0 = wrong or negative answer.  
-   - For extra questions not in the questionnaire:  
-     Add them in a **separate section** of the JSON called `"extra_questions"`, each with:  
-       `"Question"`, `"Quality"` ("Helpful", "Neutral", "Unhelpful"),  
-       `"Question_quality_score"` (0.5 for Helpful, 0 for Neutral, -0.5 for Unhelpful), and  
-       `"Summary"` (summarize if response is long).
-
-3. **Coverage Rules**  
-   - Every one of the 31 predefined questions must appear in the JSON, even if not asked (mark `"Question_Quality": "Not asked"`, `"Response_Quality": "Not answered"`, and scores = 0).
-   - Do not skip any question from the questionnaire.
-
-4. **Feedback Sections**  
-   After the main JSON array, add:  
-   - `"interviewer_feedback"`: total fully/partially/not asked counts, number of helpful/unhelpful extra questions, strengths, weaknesses, recommendations, and average interviewer score.  
-   - `"candidate_feedback"`: average candidate score, response quality summary, recommendations, and personality assessment (positivity, honesty, humility, desire to work, discipline, job understanding, suitability).
-   - Each `"reason"` must be concise (1–2 sentences) and supported by the transcript — no assumptions or fabricated details.
-5. **Language**  
-   - All content must be in English.
-   - Preserve meaning exactly; do not invent information not present in the transcript.
-
-Example JSON structure:
-```json
-{{ [ 
-"questionnaire_responses":[
-    {{
-        "id": 1,
-        "Competency": "Past work experience",
-        "Predefined_Question": "<question from questionnaire>",
-        "Question_asked": "Exact question asked",
-        "Question_Quality": "Fully asked",
-        "Reason for QQ": "<Reason for giving the question that quality>"
-        "Response": "Exact candidate response",
-        "Summary": "Brief 2-line summary of response",
-        "Response_Quality": "Partially answered",
-        "Reason for RQ": "<Reason for giving the Response that quality>"
-        "Question_score": 1,
-        "Response_score": 0.5
-    }},
-  ...
-],
-"extra_questions": [
-  {{
-    "Question": "Extra question text",
-    "Quality": "Helpful",
-    "Question_quality_score": 0.5,
-    "Summary": "Short summary of answer"
-  }}
-],
-"interviewer_feedback": {{
-   "total_fully_asked": 20,
-   "total_partially_asked": 8,
-   "total_not_asked": 3,
-   "helpful_extra_questions": 2,
-   "unhelpful_extra_questions": 1,
-   "strengths": "...",
-   "weaknesses": "...",
-   "recommendations": "...",
-   "average_score": 0.78
-}},
-"candidate_feedback":
-    - "average_score": Average candidate score across all predefined questions.
-    - "response_quality_summary": Brief assessment of overall response quality.
-    - "recommendations": Suggestions for improvement.
-    - "personality_assessment": {{
-    "Right Person": {{
-        "Positivity": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
-        "Cheerfulness/Energy": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
-        "Willingness to learn": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
-        "Honesty": {{{{ "value": True/false, "reason": "<evidence from transcript>" }}}},
-        "Determination/Perseverance": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}}
-    }},
-    "Right Seat": {{
-        "Understands the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
-        "Wants to do the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}},
-        "Has the ability to do the work": {{{{ "value": True/False, "reason": "<evidence from transcript>" }}}}
-    }}
-}}
-    ]
-    }}
+{prompt}
+\"\"\"
        
 """
         )
