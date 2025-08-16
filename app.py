@@ -525,13 +525,13 @@ def report_page(job_id):
 
     return render_template("report.html", job_id=job_id, user=current_user)
 
-@app.route('/jobs')
-@jwt_required()
-def jobs_page():
-    with open(JOBS_FILE) as f:
-        jobs = json.load(f)
-        current_user = get_jwt_identity()
-    return render_template("jobs.html", jobs=jobs,user=current_user)
+# @app.route('/jobs')
+# @jwt_required()
+# def jobs_page():
+#     with open(JOBS_FILE) as f:
+#         jobs = json.load(f)
+#         current_user = get_jwt_identity()
+#     return render_template("jobs.html", jobs=jobs,user=current_user)
 
 
 # Login endpoint
@@ -791,6 +791,46 @@ def delete_file(job_id, filename):
     if removed > 0:
         return "", 200
     return "", 404
+
+
+@app.route("/jobs")
+@jwt_required()
+def list_jobs():
+    current_user = get_jwt_identity()
+    with open(JOBS_FILE) as f:
+        jobs = json.load(f)
+
+    jobs_with_counts = []
+    for job in jobs:
+        job_id = job["id"]
+        job_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
+
+        # Count total audio files
+        total_audios = len([
+            f for f in os.listdir(job_folder)
+            if f.lower().endswith(".wav")
+        ]) if os.path.exists(job_folder) else 0
+
+        # Count total runs in queue or processing for this job_id
+        active_runs = sum(
+            1 for item in list(report_queue.queue)
+            if str(item[2]) == str(job_id)
+        ) + sum(
+            1 for jid, status in jobs_status.items()
+            if str(status.get("job_folder", "")).endswith(f"job_{job_id}")
+            and status.get("status") in ["pending", "processing", "Uploading to GCS", "Transcribing Audio", "Generating Report"]
+        )
+
+        jobs_with_counts.append({
+            "id": job_id,
+            "name": job["name"],
+            "total_audios": total_audios,
+            "active_runs": active_runs,
+            "current_user": current_user
+        })
+
+    return render_template("jobs.html", jobs=jobs_with_counts)
+
 
 
 if __name__ == '__main__':
