@@ -2,202 +2,260 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Jobs Dashboard</title>
+    <title>Job Management</title>
     <style>
         body {
+            background-color: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #0e0e0e;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            padding: 2rem;
         }
-
-        .container {
-            width: 100%;
-            max-width: 800px;
-            background-color: #1a1a1a;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
-        }
-
-        h1, h2 {
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-
-        p {
-            text-align: center;
-            margin-bottom: 2rem;
-            font-size: 1rem;
-            color: #ccc;
-        }
-
-        button, input[type="text"] {
-            padding: 0.75rem;
-            border-radius: 6px;
-            border: none;
-            font-size: 1rem;
-            outline: none;
-        }
-
-        input[type="text"] {
-            background-color: #262626;
-            color: #fff;
-            width: calc(100% - 1.5rem);
-            margin-bottom: 1rem;
-        }
-
-        input::placeholder {
-            color: #888;
-        }
-
-        button {
-            background-color: #0066ff;
-            color: white;
-            cursor: pointer;
-            transition: background 0.2s ease;
-            font-weight: bold;
-        }
-
-        button:hover {
-            background-color: #0052cc;
-        }
-
-        #logoutBtn {
-            background-color: #ff3333;
-            margin-bottom: 1.5rem;
-        }
-
-        #logoutBtn:hover {
-            background-color: #cc2929;
-        }
-
-        .deleteBtn {
-            background-color: #cc0000;
-            padding: 0.4rem 0.7rem;
-            margin-left: 1rem;
-            font-size: 0.85rem;
-        }
-
-        .deleteBtn:hover {
-            background-color: #990000;
-        }
-
-        ul {
-            list-style: none;
-            padding: 0;
-            margin-top: 1rem;
-        }
-
-        li {
-            background-color: #262626;
-            margin-bottom: 0.5rem;
-            padding: 0.75rem;
-            border-radius: 6px;
+        header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 1rem;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #333;
         }
-
-        li a {
+        button.logout-btn {
+            background-color: #ff4d4d;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button.logout-btn:hover {
+            background-color: #e60000;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+        a.job-link {
+            color: white;
             text-decoration: none;
-            color: #fff;
+        }
+        a.job-link:hover {
+            text-decoration: underline;
+        }
+        .counts {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-left: 0.5rem;
+        }
+        button.delete-btn {
+            background-color: #ff3333;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+        button.delete-btn:hover {
+            background-color: #cc0000;
+        }
+        .floating-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            background-color: #0066ff;
+            color: white;
+            font-size: 2rem;
             font-weight: bold;
-            transition: color 0.2s ease;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: background 0.2s ease;
         }
-
-        li a:hover {
-            color: #00aaff;
+        .floating-btn:hover {
+            background-color: #0052cc;
         }
-
-        form {
-            display: flex;
-            flex-direction: column;
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
             align-items: center;
+        }
+        .modal-content {
+            background-color: #1a1a1a;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.6);
+            text-align: center;
+            position: relative;
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 2rem;
+            color: #fff;
+            cursor: pointer;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            background-color: #262626;
+            border: none;
+            border-radius: 6px;
+            color: white;
+        }
+        .modal-content button {
+            background-color: #0066ff;
+            color: white;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+        .modal-content button:hover {
+            background-color: #0052cc;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Jobs Dashboard</h1>
-        <p>Logged in as: {{ user }}</p>
-        <button id="logoutBtn">Logout</button>
 
+<header>
+    <h1>Job List</h1>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
+</header>
+
+<main>
+    <table id="jobsTable">
+        <thead>
+            <tr>
+                <th>Job Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="jobsList">
+        {% for job in jobs %}
+        <tr data-id="{{ job.id }}">
+            <td>
+                <a href="/report/{{ job.id }}" class="job-link">
+                    {{ job.name }}
+                    <span class="counts">
+                        ({{ job.total_audios }} audios, {{ job.active_runs }} running)
+                    </span>
+                </a>
+            </td>
+            <td style="text-align: right;">
+                <button class="delete-btn" onclick="deleteJob('{{ job.id }}')">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</main>
+
+<!-- Floating Add Button -->
+<button id="openModalBtn" class="floating-btn">+</button>
+
+<!-- Create Job Modal -->
+<div id="createJobModal" class="modal">
+    <div class="modal-content">
+        <span id="closeModalBtn" class="close-btn">&times;</span>
         <h2>Create New Job</h2>
         <form id="createJobForm">
             <input type="text" name="job_name" placeholder="Job Name" required>
             <button type="submit">Create Job</button>
         </form>
-
-        <h2>Job List</h2>
-        <ul id="jobsList">
-            {% for job in jobs %}
-            <li data-id="{{ job.id }}">
-                <a href="/report/{{ job.id }}">{{ job.name }}</a>
-                <button class="deleteBtn">Delete</button>
-            </li>
-            {% endfor %}
-        </ul>
     </div>
+</div>
 
-    <script>
-        document.getElementById("logoutBtn").addEventListener("click", async () => {
-            await fetch("/logout", { method: "POST", credentials: "same-origin" });
-            window.location.href = "/";
+<script>
+    const modal = document.getElementById("createJobModal");
+    const openBtn = document.getElementById("openModalBtn");
+    const closeBtn = document.getElementById("closeModalBtn");
+    const createJobForm = document.getElementById("createJobForm");
+    const jobsList = document.getElementById("jobsList");
+
+    openBtn.addEventListener("click", () => modal.style.display = "flex");
+    closeBtn.addEventListener("click", () => modal.style.display = "none");
+
+    window.addEventListener("click", (e) => {
+        if (e.target === modal) modal.style.display = "none";
+    });
+
+    createJobForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const jobName = createJobForm.job_name.value;
+
+        const res = await fetch("/create_job", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ job_name: jobName }),
+            credentials: "same-origin"
         });
 
-        document.getElementById("createJobForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const job_name = formData.get("job_name");
-
-            const res = await fetch("/create_job", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ job_name }),
-                credentials: "same-origin"
-            });
-
+        if (res.ok) {
             const data = await res.json();
-            if (res.ok) {
-                const ul = document.getElementById("jobsList");
-                const li = document.createElement("li");
-                li.setAttribute("data-id", data.job.id);
-                li.innerHTML = `
-                    <a href="/report/${data.job.id}">${data.job.name}</a>
-                    <button class="deleteBtn">Delete</button>
-                `;
-                ul.appendChild(li);
-                e.target.reset();
-            } else {
-                alert(data.msg);
-            }
+            addJobToList(data.job.id, data.job.name, data.job.total_audios, data.job.active_runs);
+            modal.style.display = "none";
+            createJobForm.reset();
+        } else {
+            alert("Failed to create job.");
+        }
+    });
+
+    function addJobToList(id, name, total_audios, active_runs) {
+        const row = document.createElement("tr");
+        row.dataset.id = id;
+        row.innerHTML = `
+            <td>
+                <a href="/report/${id}" class="job-link">
+                    ${name}
+                    <span class="counts">(${total_audios} audios, ${active_runs} running)</span>
+                </a>
+            </td>
+            <td style="text-align: right;">
+                <button class="delete-btn" onclick="deleteJob('${id}')">Delete</button>
+            </td>
+        `;
+        jobsList.appendChild(row);
+    }
+
+    async function deleteJob(id) {
+        if (!confirm("Are you sure you want to delete this job?")) return;
+
+        const res = await fetch(`/delete_job/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            const row = document.querySelector(`#jobsList tr[data-id="${id}"]`);
+            if (row) row.remove();
+        } else {
+            alert("Failed to delete job.");
+        }
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        fetch("/logout", { method: "POST" }).then(() => {
+            window.location.href = "/login";
         });
+    });
+</script>
 
-        document.getElementById("jobsList").addEventListener("click", async (e) => {
-            if (e.target.classList.contains("deleteBtn")) {
-                const li = e.target.closest("li");
-                const jobId = li.getAttribute("data-id");
-
-                const res = await fetch(`/delete_job/${jobId}`, {
-                    method: "DELETE",
-                    credentials: "same-origin"
-                });
-
-                if (res.ok) {
-                    li.remove();
-                } else {
-                    const data = await res.json();
-                    alert(data.msg || "Error deleting job.");
-                }
-            }
-        });
-    </script>
 </body>
 </html>
