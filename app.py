@@ -20,7 +20,6 @@ app = Flask(__name__)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
-# Add this line:
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_COOKIE_NAME"] = "access_token_cookie"
 app.config["JWT_COOKIE_SECURE"] = False       # True if using HTTPS
@@ -52,9 +51,6 @@ JOBS_FILE = "jobs.json"
 if not os.path.exists(JOBS_FILE):
     with open(JOBS_FILE, "w") as f:
         json.dump([], f)
-
-
-
 
 
 # Job queue

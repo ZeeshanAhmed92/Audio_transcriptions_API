@@ -1,0 +1,23 @@
+{
+  "questions": [
+    "Did he prepare properly before going to the shop?",
+    "Did he plan in advance which SKUs he would try to sell today?",
+    "Did he write down the shop names and plan the route?",
+
+    "Greeting & Relationship: Did he greet the shopkeeper warmly and interact in a polite manner? Did he ask/confirm the shopkeeper’s name?",
+    "If it is an existing outlet – what is his relationship like with this shopkeeper?",
+    "If it is a new outlet – did he make an effort to build a relationship with this shopkeeper?",
+
+    "Did he check the stock properly and keep the products arranged neatly so they are easy to find?",
+    "Before starting to push products, did he ask questions to understand the shop’s needs?",
+    "From the start to the end of the shop call, did he manage the time properly?",
+    "If the shopkeeper raised any issues, did he listen attentively with patience and try to solve them?",
+    "If the shopkeeper raised any objections while placing the order, did he make an effort to resolve them and encourage the shopkeeper to place the order?",
+    "Did he properly repeat/confirm the order with the shopkeeper and ensure that everything was noted accurately?",
+    "If the order was not taken – what attempts did he make to convince the shopkeeper? Did the shopkeeper become more confident about placing an order next time?"
+  ],
+
+  "report_prompt": "INSTRUCTIONS FOR REPORT GENERATION:\n1. **Output Format**  \n   - JSON array of objects, where each object represents one question (see Example below).  \n   - Each object must have:  \n     `id`, `Competency`, `Predefined_Question`, `Question_asked`, `Question_Quality`, `Reason for QQ`, `Response`, `Summary`,  \n     `Response_Quality`, `Reason for RQ`, `Question_score`, `Response_score`.\n\n2. **Scoring Rules**  \n   - Question_score:  \n     1 = fully aligned with predefined question,  \n     0.5 = partially aligned,  \n     0 = not aligned at all.  \n   - Response_score:  \n     1 = fully answered,  \n     0.5 = partially answered,  \n     0 = wrong or negative answer.  \n   - For extra questions not in the questionnaire:  \n     Add them in a **separate section** of the JSON called `\"Extra_questions\"`, each with:  \n       `\"Question\"`, `\"Quality\"` (\"Helpful\", \"Neutral\", \"Unhelpful\"),  \n       `\"Question_quality_score\"` (0.5 for Helpful, 0 for Neutral, -0.5 for Unhelpful), and  \n       `\"Summary\"` (summarize if response is long).\n\n3. **Coverage Rules**  \n   - Every one of the 13 predefined questions must appear in the JSON, even if not asked (mark `\"Question_Quality\": \"Not asked\"`, `\"Response_Quality\": \"Not answered\"`, and scores = 0).  \n   - Do not skip any question from the questionnaire.\n\n4. **Language**  \n   - All content must be in English.  \n   - Preserve meaning exactly; do not invent information not present in the transcript.\n\nExample JSON structure:\n{\n  \"Pre-Training Sales Call Recording\": [\n    {\n      \"id\": 1,\n    \"Competency\": \"Pre_Call_Planning\",\n    \"Predefined_Question\": \"Did he prepare properly before going to the shop?\",\n    \"Question_asked\": \"Exact wording used in transcript\",\n    \"Question_Quality\": \"Fully asked\",\n    \"Reason for QQ\": \"<short reason>\",\n    \"Response\": \"Exact response\",\n    \"Summary\": \"Short summary of response\",\n    \"Response_Quality\": \"Partially answered\",\n    \"Reason for RQ\": \"<short reason>\",\n    \"Question_score\": 1,\n    \"Response_score\": 0.5\n  },\n  {\n    \"id\": 2,\n    \"Competency\": \"Greeting & Relationship\",\n    \"Predefined_Question\": \"Did he greet the shopkeeper warmly and interact in a polite manner?\",\n    ...\n  }\n]\n```",
+
+  "auditor_system_prompt": "You are a professional Sales Auditor. You will be given:\n1. A conversational transcript of a sales call.\n2. A set of predefined questionnaire questions.\n\nYour job:\nFill the questionnaire in light of the provided transcript, strictly following the given format and scoring rules.\n\nSTRICT OUTPUT RULES:\n- Use only the questionnaire that best matches the subject matter of the provided transcript.\n- Include all 13 main questions from the questionnaire in the report, in the same order, without omission.\n- Also identify and document any extra questions that were asked but are not in the questionnaire.\n- Output must be valid JSON loadable directly in Python without any modifications."
+}

@@ -11,41 +11,57 @@ from vertexai.generative_models import GenerativeModel, Part
 from langchain_core.messages import SystemMessage, HumanMessage
 
 
-def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000):
-    """
-    Splits the audio file into chunks of specified length.
-    
-    Args:
-        file_path (str): Path to the input audio file.
-        chunk_length_ms (int): Length of each chunk in milliseconds (default 10 min).
+from pydub import AudioSegment
+import os
 
-    Returns:
-        List[str]: List of paths to the chunked audio files.
+def split_audio(file_path: str,
+                chunk_length_ms: int = 5 * 60 * 1000,
+                target_formats=None):
     """
-    if not os.path.exists(file_path):
+    Split a WAV/MP3 file into chunks and export them in one or more formats (wav, mp3).
+    Does NOT convert input. The caller must ensure the input is either .wav or .mp3.
+    """
+
+    if not os.path.isfile(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
+
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    ext = os.path.splitext(file_path)[1].replace('.', '').lower()
+    if ext not in ("wav", "mp3"):
+        raise ValueError(f"split_audio() expects .wav or .mp3 as input, got: {ext}")
+
+    if target_formats is None:
+        target_formats = ["wav"]
 
     audio = AudioSegment.from_file(file_path)
     audio_length = len(audio)
-    
-    # If audio is shorter than the chunk size, return as-is
-    if audio_length <= chunk_length_ms:
-        return [file_path]
+    result = {}
 
-    chunks = []
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    ext = os.path.splitext(file_path)[1]
-    chunks_dir = os.path.join(os.path.dirname(file_path), "chunks")
-    os.makedirs(chunks_dir, exist_ok=True)
+    for fmt in target_formats:
+        if fmt not in ("wav", "mp3"):
+            raise ValueError("target_formats can contain only 'wav' or 'mp3'")
 
-    for i in range(0, len(audio), chunk_length_ms):
-        chunk = audio[i:i + chunk_length_ms]
-        chunk_filename = f"{base_name}_part{i//chunk_length_ms + 1}{ext}"
-        chunk_path = os.path.join(chunks_dir, chunk_filename)
-        chunk.export(chunk_path, format=ext.replace('.', ''))
-        chunks.append(chunk_path)
+        chunks_dir = os.path.join(os.path.dirname(file_path), f"chunks_{fmt}")
+        os.makedirs(chunks_dir, exist_ok=True)
 
-    return chunks
+        if audio_length <= chunk_length_ms:
+            out_path = os.path.join(chunks_dir, f"{base_name}.{fmt}")
+            audio.export(out_path, format=fmt)
+            result[fmt] = [out_path]
+            continue
+
+        paths = []
+        for i in range(0, audio_length, chunk_length_ms):
+            chunk = audio[i:i + chunk_length_ms]
+            name = f"{base_name}_part{i // chunk_length_ms + 1}.{fmt}"
+            path = os.path.join(chunks_dir, name)
+            chunk.export(path, format=fmt)
+            paths.append(path)
+        result[fmt] = paths
+
+    return result
+
+
 
 def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name: str) -> str:
     if not os.path.exists(source_file_path):
@@ -60,20 +76,37 @@ def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name
     print(f"File uploaded successfully: {gcs_uri}")
     return gcs_uri
 
-def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str) -> list:
+
+def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, target_formats=None) -> list:
     """
-    Splits the audio into 10-min chunks, uploads each to GCS, and returns their URIs.
+    Converts source file to .wav if it's not .wav or .mp3.
+    Then splits and uploads each chunk to GCS.
     """
-    chunk_files = split_audio(source_file_path)
+    # Convert to WAV if needed
+    base_name = os.path.splitext(os.path.basename(source_file_path))[0]
+    ext = os.path.splitext(source_file_path)[1].replace('.', '').lower()
+
+    if ext not in ("wav", "mp3"):
+        # convert to wav
+        original_audio = AudioSegment.from_file(source_file_path)
+        converted_path = os.path.join(os.path.dirname(source_file_path), f"{base_name}.wav")
+        original_audio.export(converted_path, format="wav")
+        source_file_path = converted_path  # use the converted file going forward
+
+    # Split the (now validated) file
+    chunk_dict = split_audio(source_file_path, target_formats=target_formats)
     gcs_uris = []
 
-    for chunk_file in chunk_files:
-        chunk_name = os.path.basename(chunk_file)
-        gcs_path = f"{gcs_folder}/{chunk_name}"
-        uri = upload_to_gcs(bucket_name, chunk_file, gcs_path)
-        gcs_uris.append(uri)
+    # Upload each chunk
+    for _, chunk_files in chunk_dict.items():
+        for chunk_file in chunk_files:
+            chunk_name = os.path.basename(chunk_file)
+            gcs_path = f"{gcs_folder}/{chunk_name}"
+            uri = upload_to_gcs(bucket_name, chunk_file, gcs_path)
+            gcs_uris.append(uri)
 
     return gcs_uris
+
 
 
 # def process_audio_with_gemini(project_id, location, gcs_uri):
@@ -265,87 +298,98 @@ def clean_and_parse_json(raw_text):
         return None
     
 
-def export_report_to_single_excel(report_data, output_file="interview_report2.xlsx"):
+def export_report_to_single_excel(report_data, output_file="report.xlsx"):
     """
-    Exports all sections of the interview report into a single Excel sheet,
-    each section with bold colored title row, bold colored header row,
-    and 2 empty rows between sections.
+    Exports a report (interview or sales_call) into a single-sheet Excel file.
+    Automatically detects the report type based on the keys in the JSON.
     """
-    # Ensure dict
+
+    # Parse JSON string if needed
     if isinstance(report_data, str):
         data = json.loads(report_data)
     else:
         data = report_data
 
-    # Prepare blocks of (section_title, DataFrame)
-    blocks = [
-        ("Questionnaire Responses", pd.DataFrame(data.get("questionnaire_responses", []))),
-        ("Extra Questions", pd.DataFrame(data.get("extra_questions", []))),
-        ("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])),
-    ]
+    blocks = []
 
-    # Candidate Feedback — flatten nested Right Person / Right Seat
-    candidate_feedback = data.get("candidate_feedback", {})
-    personality = candidate_feedback.get("personality_assessment", {})
+    # ---------------------------------------------------------------
+    # Detect structure → Interview vs Sales Call
+    # ---------------------------------------------------------------
+    if "Interview_Questionair_Responses" in data:
+        # → Interview report format (old)
+        blocks.append(("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))))
+        blocks.append(("Extra Questions", pd.DataFrame(data.get("extra_questions", []))))
+        blocks.append(("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])))
 
-    flat_personality = {}
-    for group, traits in personality.items():  # group = "Right Person" / "Right Seat"
-        for trait, detail in traits.items():
-            col_prefix = f"{group}_{trait}".replace(" ", "_")
-            flat_personality[f"{col_prefix}_value"] = detail.get("value")
-            flat_personality[f"{col_prefix}_reason"] = detail.get("reason")
-    candidate_df = pd.DataFrame([{**candidate_feedback, **flat_personality}])
-    candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
-    blocks.append(("Candidate Feedback", candidate_df))
+        # Candidate feedback (flatten personality)
+        candidate_feedback = data.get("candidate_feedback", {})
+        personality = candidate_feedback.get("personality_assessment", {})
+        flat_personality = {}
+        for group, traits in personality.items():
+            for trait, detail in traits.items():
+                col_prefix = f"{group}_{trait}".replace(" ", "_")
+                flat_personality[f"{col_prefix}_value"] = detail.get("value")
+                flat_personality[f"{col_prefix}_reason"] = detail.get("reason")
+        candidate_df = pd.DataFrame([{**candidate_feedback, **flat_personality}])
+        candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
+        blocks.append(("Candidate Feedback", candidate_df))
 
-    # Write to Excel
+    else:
+        # → Sales call report
+        results = (
+            data.get("Pre-Training Sales Call Recording") 
+            if "Pre-Training Sales Call Recording" in data 
+            else data
+        )
+        blocks.append(("Pre-Training Sales Call Recording", pd.DataFrame(results)))
+
+        # Extra questions
+        extra = data.get("extra_questions", [])
+        if extra:
+            blocks.append(("Extra Questions", pd.DataFrame(extra)))
+
+    # ---------------------------------------------------------------
+    # Write to Excel (single sheet, styled blocks)
+    # ---------------------------------------------------------------
     with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
         workbook = writer.book
-        worksheet = workbook.add_worksheet("Interview Report")
-        writer.sheets["Interview Report"] = worksheet
+        worksheet = workbook.add_worksheet("Report")
+        writer.sheets["Report"] = worksheet
 
-        # Formats
-        section_format = workbook.add_format({
-            "bold": True,
-            "font_color": "white",
-            "bg_color": "#4F81BD",
-            "align": "center",
-            "valign": "vcenter"
+        section_fmt = workbook.add_format({
+            "bold": True, "font_color": "white", "bg_color": "#4F81BD",
+            "align": "center", "valign": "vcenter"
         })
-        header_format = workbook.add_format({
-            "bold": True,
-            "bg_color": "#D9E1F2",
-            "align": "center",
-            "valign": "vcenter"
+        header_fmt = workbook.add_format({
+            "bold": True, "bg_color": "#D9E1F2",
+            "align": "center", "valign": "vcenter"
         })
 
         row_cursor = 0
-        for section_title, df in blocks:
-            # Section Title Row
-            worksheet.write(row_cursor, 0, section_title, section_format)
+        for title, df in blocks:
+            worksheet.write(row_cursor, 0, title, section_fmt)
             row_cursor += 1
 
             if not df.empty:
-                # Write table header
+                # header
                 for col_num, col_name in enumerate(df.columns):
-                    worksheet.write(row_cursor, col_num, col_name, header_format)
+                    worksheet.write(row_cursor, col_num, col_name, header_fmt)
 
-                # Write table rows
+                # rows
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
 
-                row_cursor += len(df) + 1  # +1 for header
+                row_cursor += len(df) + 1
             else:
                 worksheet.write(row_cursor, 0, "(No data)")
                 row_cursor += 1
 
-            # Add 2 empty rows before next section
-            row_cursor += 2
+            row_cursor += 2  # spacing
 
-        # Auto column width
         for col_num in range(worksheet.dim_colmax + 1):
-            worksheet.set_column(col_num, col_num, 20)
+            worksheet.set_column(col_num, col_num, 22)
 
-    print(f"✅ Report exported to {output_file} (single sheet, styled sections)")
+    print(f"✅ Report exported to {output_file}")
+
 
