@@ -298,25 +298,13 @@ def clean_and_parse_json(raw_text):
         return None
     
 
-def export_report_to_single_excel(report_data, output_file="report.xlsx"):
-    """
-    Exports a report (interview or sales_call) into a single-sheet Excel file.
-    Automatically detects the report type based on the keys in the JSON.
-    """
-
-    # Parse JSON string if needed
-    if isinstance(report_data, str):
-        data = json.loads(report_data)
-    else:
-        data = report_data
+def export_report_to_single_excel(data, output_file="report.xlsx"):
+    import pandas as pd
 
     blocks = []
 
-    # ---------------------------------------------------------------
-    # Detect structure → Interview vs Sales Call
-    # ---------------------------------------------------------------
+    # ------------------- Interview report -------------------
     if "Interview_Questionair_Responses" in data:
-        # → Interview report format (old)
         blocks.append(("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))))
         blocks.append(("Extra Questions", pd.DataFrame(data.get("extra_questions", []))))
         blocks.append(("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])))
@@ -334,23 +322,71 @@ def export_report_to_single_excel(report_data, output_file="report.xlsx"):
         candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
         blocks.append(("Candidate Feedback", candidate_df))
 
-    else:
-        # → Sales call report
-        results = (
-            data.get("Pre-Training Sales Call Recording") 
-            if "Pre-Training Sales Call Recording" in data 
-            else data
-        )
-        blocks.append(("Pre-Training Sales Call Recording", pd.DataFrame(results)))
+    # ------------------- Sales call report -------------------
+    elif "Pre_Call_Sales_Recording" in data:
+        sales_data = data["Pre_Call_Sales_Recording"]
+        for record in sales_data:
+            for main_section, main_content in record.items():
+                rows = {}
 
-        # Extra questions
-        extra = data.get("extra_questions", [])
-        if extra:
-            blocks.append(("Extra Questions", pd.DataFrame(extra)))
+                # Section order mapping (for flattening)
+                section_order = {
+                    "Core_Preparation": ["general_readiness", "sku_plan", "personalization", "written_explicit_plan",
+                                         "core_preparation_subtotal", "core_preparation_percentage"],
+                    "Objective_Clarity": ["clear_objective_for_visit", "specific_actions_to_achieve_it",
+                                          "objective_clarity_subtotal", "objective_clarity_percentage"],
+                    "Account_Status_Strategy": ["usual_order_retailer", "priority_product_missing", "missed_order_last_visit",
+                                                "no_orders_yet", "never_ordered_before", "account_status_strategy_subtotal",
+                                                "account_status_strategy_percentage"],
+                    "Mental_Preparation_and_Focus": ["determination_statement", "focused_execution",
+                                                     "mental_preparation_and_focus_subtotal",
+                                                     "mental_preparation_and_focus_percentage"],
+                    "Greeting_and_Relationship": ["warm_greeting_and_polite_conduct", "uses_or_learns_retailer_name",
+                                                  "self_introduction_and_contact_visibility", "greets_helpers_if_present",
+                                                  "relationship_with_outlet_type", "greeting_and_relationship_subtotal",
+                                                  "greeting_and_relationship_percentage"],
+                    "Discovery": ["asks_need_finding_questions", "uses_discovery_to_guide_push",
+                                  "discovery_subtotal", "discovery_percentage"],
+                    "Learn_About_the_Shop": ["asks_about_shop_operations", "understands_customer_base",
+                                             "learn_about_shop_subtotal", "learn_about_shop_percentage"],
+                    "Stock_Check_and_Competitive_Scan": ["stock_check_completed", "competitive_products_scanned",
+                                                        "stock_check_subtotal", "stock_check_percentage"],
+                    "Merchandising_Execution": ["display_correctness", "promotion_visibility",
+                                                "merchandising_execution_subtotal", "merchandising_execution_percentage"],
+                    "Order_Initiation_and_Value_Presentation": ["order_initiated_correctly", "value_justification_given",
+                                                                "order_value_subtotal", "order_value_percentage"]
+                }
 
-    # ---------------------------------------------------------------
-    # Write to Excel (single sheet, styled blocks)
-    # ---------------------------------------------------------------
+                # Flatten metrics for each subsection
+                for sub_section, metrics in main_content.items():
+                    if sub_section in section_order:
+                        for metric in section_order[sub_section]:
+                            metric_detail = metrics.get(metric, {})
+                            if isinstance(metric_detail, dict):
+                                for k, v in metric_detail.items():
+                                    col_name = f"{metric}_{k}".replace(" ", "_")
+                                    rows[col_name] = v
+                            else:
+                                rows[metric] = metric_detail
+                    else:
+                        for metric, metric_detail in metrics.items():
+                            if isinstance(metric_detail, dict):
+                                for k, v in metric_detail.items():
+                                    col_name = f"{metric}_{k}".replace(" ", "_")
+                                    rows[col_name] = v
+                            else:
+                                rows[metric] = metric_detail
+
+                df = pd.DataFrame([rows])
+                blocks.append((main_section, df))
+
+            # Extra questions
+            extra_questions = record.get("Extra_questions", [])
+            if extra_questions:
+                blocks.append(("Extra Questions", pd.DataFrame(extra_questions)))
+
+    # ------------------- Write to single Excel sheet -------------------
+    import xlsxwriter
     with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
         workbook = writer.book
         worksheet = workbook.add_worksheet("Report")
@@ -371,11 +407,11 @@ def export_report_to_single_excel(report_data, output_file="report.xlsx"):
             row_cursor += 1
 
             if not df.empty:
-                # header
+                # Write header
                 for col_num, col_name in enumerate(df.columns):
                     worksheet.write(row_cursor, col_num, col_name, header_fmt)
 
-                # rows
+                # Write rows
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
@@ -387,9 +423,12 @@ def export_report_to_single_excel(report_data, output_file="report.xlsx"):
 
             row_cursor += 2  # spacing
 
+        # Adjust column widths
         for col_num in range(worksheet.dim_colmax + 1):
             worksheet.set_column(col_num, col_num, 22)
 
     print(f"✅ Report exported to {output_file}")
+
+
 
 
