@@ -212,47 +212,65 @@ def process_audio_with_gemini(project_id, location, gcs_uri):
         return None
 
 
-def generate_report(transcription,questionaire):
+def generate_report(transcription, questionaire):
     """
-    Generates a structured JSON interview report from a Bengali transcript using Gemini 1.5/2.5 Pro via ChatVertexAI (LangChain),
-    based on a provided questionnaire and sample report format.
-
-    The output will:
-    - Contain one entry for each of the 31 main questions in the questionnaire.
-    - Include extra questions (those asked but not in the questionnaire) in a separate section with quality scoring.
-    - Contain interviewer and candidate feedback sections.
-    - Be fully in English.
-    - Be valid JSON loadable by Python's json library.
+    Generates a structured JSON interview report from a transcript using Gemini 1.5/2.5 Pro via ChatVertexAI,
+    based on a provided questionnaire and sample report format. Supports both dict-of-sections and flat list
+    questionnaires, and includes topic_context for ifrst_sales_call.json.
     """
-
-    # Use an absolute path to the 'questions.txt' file
     script_dir = os.path.dirname(__file__)
     questions_file_path = os.path.join(script_dir, 'questionaires', questionaire)
 
     with open(questions_file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
     questions = data["questions"]
-    prompt = data["report_prompt"]
+    report_prompt = data["report_prompt"]
     system_prompt = data["auditor_system_prompt"]
+
+    # ------------------------------------------------------------------
+    # Handle both structures: (1) dict of section:topic_list, and (2) flat list of topics
+    # ------------------------------------------------------------------
+    if isinstance(questions, dict):
+        questionnaire_text = json.dumps(questions, ensure_ascii=False, indent=2)
+    elif isinstance(questions, list):
+        # If only a flat list of topics is provided, wrap them under a generic key
+        questionnaire_text = json.dumps(
+            {"Topics": questions}, ensure_ascii=False, indent=2
+        )
+    else:
+        raise ValueError(
+            "`questions` must be either a dict (sections) or a list (flat)"
+        )
+
+    # ------------------------------------------------------------------
+    # If file is 'ifrst_sales_call.json', also include topic_context (detailed descriptions)
+    # ------------------------------------------------------------------
+    extra_context_text = ""
+    if questionaire == "first_sales_call.json" and "topic_context" in data:
+        topic_context_text = json.dumps(
+            data["topic_context"], ensure_ascii=False, indent=2
+        )
+        extra_context_text = f"\n\nTopic Context:\n\"\"\"\n{topic_context_text}\n\"\"\""
+
+    # ------------------------------------------------------------------
+
     messages = [
-        SystemMessage(
-            content=(
-                system_prompt
-            )
-        ),
+        SystemMessage(content=system_prompt),
         HumanMessage(
             content=f"""
 Questionnaire:
 \"\"\"
-{questions}
+{questionnaire_text}
 \"\"\"
+{extra_context_text}
+
 Conversational Transcript:
-\"\"\"
+\"\"\" 
 {transcription}
-\"\"\"
-{prompt}
-\"\"\"
-       
+\"\"\" 
+
+{report_prompt}
 """
         )
     ]
@@ -267,6 +285,7 @@ Conversational Transcript:
     response = chat.invoke(messages)
     report = response.content.strip()
     return report
+
 
 
 def clean_and_parse_json(raw_text):
@@ -298,136 +317,121 @@ def clean_and_parse_json(raw_text):
         return None
     
 
-def export_report_to_single_excel(data, output_file="report.xlsx"):
-    import pandas as pd
+def export_report_to_single_excel(report_data, output_file="interview_report2.xlsx"):
+    """
+    Exports all sections of the report into a single Excel sheet.
+    Handles both INTERVIEW-type reports (questionnaire_responses, extra_questions, interviewer_feedback, candidate_feedback)
+    and SALES-CALL-type reports (Pre_Call_Planning, While_in_the_Shop, Extra_Topics).
+    """
+    # Ensure dict
+    if isinstance(report_data, str):
+        data = json.loads(report_data)
+    else:
+        data = report_data
 
     blocks = []
 
-    # ------------------- Interview report -------------------
-    if "Interview_Questionair_Responses" in data:
-        blocks.append(("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))))
-        blocks.append(("Extra Questions", pd.DataFrame(data.get("extra_questions", []))))
-        blocks.append(("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])))
+    # -----------------------------------------------------------
+    # SALES-CALL REPORT
+    # -----------------------------------------------------------
+    if "Pre_Call_Planning" in data and "While_in_the_Shop" in data:
+        # Pre Call Planning
+        blocks.append((
+            "Pre_Call_Planning",
+            pd.DataFrame(data.get("Pre_Call_Planning", []))
+        ))
+        # While in the Shop
+        blocks.append((
+            "While_in_the_Shop",
+            pd.DataFrame(data.get("While_in_the_Shop", []))
+        ))
+        # Extra Topics (if any)
+        blocks.append((
+            "Extra_Topics",
+            pd.DataFrame(data.get("Extra_Topics", []))
+        ))
 
-        # Candidate feedback (flatten personality)
+    # -----------------------------------------------------------
+    # INTERVIEW REPORT (existing logic)
+    # -----------------------------------------------------------
+    else:
+        blocks = [
+            (
+                "Interview_Questionair_Responses",
+                pd.DataFrame(data.get("Interview_Questionair_Responses", []))
+            ),
+            (
+                "Extra Questions",
+                pd.DataFrame(data.get("extra_questions", []))
+            ),
+            (
+                "Interviewer Feedback",
+                pd.DataFrame([data.get("interviewer_feedback", {})])
+            ),
+        ]
+
+        # Candidate Feedback — flatten personality_assessment
         candidate_feedback = data.get("candidate_feedback", {})
         personality = candidate_feedback.get("personality_assessment", {})
         flat_personality = {}
-        for group, traits in personality.items():
-            for trait, detail in traits.items():
-                col_prefix = f"{group}_{trait}".replace(" ", "_")
-                flat_personality[f"{col_prefix}_value"] = detail.get("value")
-                flat_personality[f"{col_prefix}_reason"] = detail.get("reason")
+        for trait, detail in personality.items():
+            flat_personality[f"{trait}_value"] = detail.get("value")
+            flat_personality[f"{trait}_reason"] = detail.get("reason")
         candidate_df = pd.DataFrame([{**candidate_feedback, **flat_personality}])
         candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
         blocks.append(("Candidate Feedback", candidate_df))
 
-    # ------------------- Sales call report -------------------
-    elif "Pre_Call_Sales_Recording" in data:
-        sales_data = data["Pre_Call_Sales_Recording"]
-        for record in sales_data:
-            for main_section, main_content in record.items():
-                rows = {}
+    # -----------------------------------------------------------
 
-                # Section order mapping (for flattening)
-                section_order = {
-                    "Core_Preparation": ["general_readiness", "sku_plan", "personalization", "written_explicit_plan",
-                                         "core_preparation_subtotal", "core_preparation_percentage"],
-                    "Objective_Clarity": ["clear_objective_for_visit", "specific_actions_to_achieve_it",
-                                          "objective_clarity_subtotal", "objective_clarity_percentage"],
-                    "Account_Status_Strategy": ["usual_order_retailer", "priority_product_missing", "missed_order_last_visit",
-                                                "no_orders_yet", "never_ordered_before", "account_status_strategy_subtotal",
-                                                "account_status_strategy_percentage"],
-                    "Mental_Preparation_and_Focus": ["determination_statement", "focused_execution",
-                                                     "mental_preparation_and_focus_subtotal",
-                                                     "mental_preparation_and_focus_percentage"],
-                    "Greeting_and_Relationship": ["warm_greeting_and_polite_conduct", "uses_or_learns_retailer_name",
-                                                  "self_introduction_and_contact_visibility", "greets_helpers_if_present",
-                                                  "relationship_with_outlet_type", "greeting_and_relationship_subtotal",
-                                                  "greeting_and_relationship_percentage"],
-                    "Discovery": ["asks_need_finding_questions", "uses_discovery_to_guide_push",
-                                  "discovery_subtotal", "discovery_percentage"],
-                    "Learn_About_the_Shop": ["asks_about_shop_operations", "understands_customer_base",
-                                             "learn_about_shop_subtotal", "learn_about_shop_percentage"],
-                    "Stock_Check_and_Competitive_Scan": ["stock_check_completed", "competitive_products_scanned",
-                                                        "stock_check_subtotal", "stock_check_percentage"],
-                    "Merchandising_Execution": ["display_correctness", "promotion_visibility",
-                                                "merchandising_execution_subtotal", "merchandising_execution_percentage"],
-                    "Order_Initiation_and_Value_Presentation": ["order_initiated_correctly", "value_justification_given",
-                                                                "order_value_subtotal", "order_value_percentage"]
-                }
-
-                # Flatten metrics for each subsection
-                for sub_section, metrics in main_content.items():
-                    if sub_section in section_order:
-                        for metric in section_order[sub_section]:
-                            metric_detail = metrics.get(metric, {})
-                            if isinstance(metric_detail, dict):
-                                for k, v in metric_detail.items():
-                                    col_name = f"{metric}_{k}".replace(" ", "_")
-                                    rows[col_name] = v
-                            else:
-                                rows[metric] = metric_detail
-                    else:
-                        for metric, metric_detail in metrics.items():
-                            if isinstance(metric_detail, dict):
-                                for k, v in metric_detail.items():
-                                    col_name = f"{metric}_{k}".replace(" ", "_")
-                                    rows[col_name] = v
-                            else:
-                                rows[metric] = metric_detail
-
-                df = pd.DataFrame([rows])
-                blocks.append((main_section, df))
-
-            # Extra questions
-            extra_questions = record.get("Extra_questions", [])
-            if extra_questions:
-                blocks.append(("Extra Questions", pd.DataFrame(extra_questions)))
-
-    # ------------------- Write to single Excel sheet -------------------
-    import xlsxwriter
+    # Write to Excel
     with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
         workbook = writer.book
         worksheet = workbook.add_worksheet("Report")
         writer.sheets["Report"] = worksheet
 
-        section_fmt = workbook.add_format({
-            "bold": True, "font_color": "white", "bg_color": "#4F81BD",
-            "align": "center", "valign": "vcenter"
+        # Formats
+        section_format = workbook.add_format({
+            "bold": True,
+            "font_color": "white",
+            "bg_color": "#4F81BD",
+            "align": "center",
+            "valign": "vcenter"
         })
-        header_fmt = workbook.add_format({
-            "bold": True, "bg_color": "#D9E1F2",
-            "align": "center", "valign": "vcenter"
+        header_format = workbook.add_format({
+            "bold": True,
+            "bg_color": "#D9E1F2",
+            "align": "center",
+            "valign": "vcenter"
         })
 
         row_cursor = 0
-        for title, df in blocks:
-            worksheet.write(row_cursor, 0, title, section_fmt)
+        for section_title, df in blocks:
+            # Section Title
+            worksheet.write(row_cursor, 0, section_title, section_format)
             row_cursor += 1
 
             if not df.empty:
-                # Write header
+                # Header row
                 for col_num, col_name in enumerate(df.columns):
-                    worksheet.write(row_cursor, col_num, col_name, header_fmt)
-
-                # Write rows
+                    worksheet.write(row_cursor, col_num, col_name, header_format)
+                # Data rows
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
-
-                row_cursor += len(df) + 1
+                row_cursor += len(df) + 1  # +1 header
             else:
                 worksheet.write(row_cursor, 0, "(No data)")
                 row_cursor += 1
 
-            row_cursor += 2  # spacing
+            # Two empty rows
+            row_cursor += 2
 
-        # Adjust column widths
+        # Auto column width
         for col_num in range(worksheet.dim_colmax + 1):
-            worksheet.set_column(col_num, col_num, 22)
+            worksheet.set_column(col_num, col_num, 20)
 
-    print(f"✅ Report exported to {output_file}")
+    print(f"✅ Report exported to {output_file} (single sheet, styled sections)")
+
 
 
 
