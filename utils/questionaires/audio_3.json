@@ -1,0 +1,62 @@
+{
+   "questions": {
+  "Interactive Training Session Conducted by Recruiter": [
+    "Regular Sales Call Habit",
+    "Active/Energetic Mindset",
+    "Product Knowledge",
+    "Prioritizing Key Outlets",
+    "Positive Communication",
+    "Positive Behaviour",
+    "Retailer Follow-ups",
+    "Route Discipline",
+    "Sales Process Knowledge",
+    "Humble & Willing to Learn",
+    "Company & Institutional Intro",
+    "Discuss Route Plan",
+    "Product Introduction & Knowledge",
+    "Product Cost & Offers",
+    "Morning Checklist",
+    "Route Task Completion",
+    "Retailer Conversation Etiquette",
+    "Building Trade Relationships",
+    "7-Step Sales Call",
+    "Target Calculation Methods",
+    "Key Points to Maintain",
+    "SR Role in Rallies",
+    "Importance of Merchandising",
+    "Post-Checklist & Next Plan",
+    "Section-wise Target Calculation"
+  ]
+}
+,
+  "topic_context": {
+  "Regular Sales Call Habit": "Habit of doing regular sales calls.",
+  "Active/Energetic Mindset": "A mindset to be active/energetic.",
+  "Product Knowledge": "Possession of product knowledge.",
+  "Prioritizing Key Outlets": "Give priority to priority outlets.",
+  "Positive Communication": "Practice positive communication.",
+  "Positive Behaviour": "Practice positive behavior.",
+  "Retailer Follow-ups": "Stay connected with retailers regarding orders.",
+  "Route Discipline": "Maintain route discipline.",
+  "Sales Process Knowledge": "Be informed about the sales process.",
+  "Humble & Willing to Learn": "Do not be arrogant; have eagerness to learn.",
+  "Company & Institutional Intro": "Teach the company introduction and basic institutional knowledge.",
+  "Discuss Route Plan": "Discuss their journey plan (route plan).",
+  "Product Introduction & Knowledge": "Introduce company products and build product knowledge.",
+  "Product Cost & Offers": "Teach product cost, key offers, and product presentation.",
+  "Morning Checklist": "Teach the morning checklist—all tasks an SR must complete in the morning.",
+  "Route Task Completion": "While on route, ensure all assigned tasks are completed.",
+  "Retailer Conversation Etiquette": "Teach how to start conversation with the retailer and what etiquette/behavior should be maintained.",
+  "Building Trade Relationships": "Teach how to quickly build trade relations with the retailer; and how to keep trade-selection responsibilities in mind during the sales call.",
+  "7-Step Sales Call": "Teach the 7 steps of a sales call.",
+  "Target Calculation Methods": "Teach the methods of calculation required to achieve the sales target.",
+  "Key Points to Maintain": "Inform and teach which key points must be maintained while working.",
+  "SR Role in Rallies": "Teach the SR’s role in company rallies and rally planning.",
+  "Importance of Merchandising": "Teach that to achieve targets and build a strong market, it is necessary to complete merchandising tasks properly.",
+  "Post-Checklist & Next Plan": "After finishing all morning checklist points, teach how to complete the remaining tasks and how to arrange the next sales plan.",
+  "Section-wise Target Calculation": "Teach the section-wise data calculation method to achieve the monthly target."
+},
+
+  "auditor_system_prompt": "You are a professional Sales Auditor. You will be given: (1) a conversational transcript of a training session conducted by a recruiter, and (2) a predefined set of topics with their content.\n\nYour task is to evaluate each topic strictly according to the following rules:\n\n1. Recruiter Evaluation (per topic):\n   - COV (Coverage): 0 = Topic not covered, 1 = Topic covered\n   - INT (Interactivity): 0 = Topic not interactive, 1 = Topic made interactive (practice/demo/role-play)\n   - Recruiter_Score = COV + INT (range 0–2)\n\n2. Candidate Evaluation (per topic):\n   - Candidate_Score (Response Adequacy): 0 = incorrect/no engagement, 1 = partially correct/minimal engagement, 2 = accurate/fully engaged\n   - candidate's_response_quality: describe briefly whether response was accurate, partially correct, or incorrect\n\n3. All predefined topics must be included in the JSON output even if they are not addressed in the transcript. For unaddressed topics, set COV = 0, INT = 0, Recruiter_Score = 0, Candidate_Score = 0, and candidate's_response_quality = 'Not addressed'.\n\n4. Compute Totals:\n   - Recruiter_Total_Earned = sum of Recruiter_Score across all topics\n   - Candidate_Total_Earned = sum of Candidate_Score across all topics\n   - Recruiter_Max = 2 × number_of_topics\n   - Candidate_Max = 2 × number_of_topics\n   - Recruiter_Percentage = (Recruiter_Total_Earned ÷ Recruiter_Max) × 100\n   - Candidate_Percentage = (Candidate_Total_Earned ÷ Candidate_Max) × 100\n\n5. Include Topic_Content in each topic in the output.\n\n6. All evaluations must be strictly based on the transcript; do not invent information.\n\n7. Return output as a valid JSON object using the structure provided in the report_prompt example.",
+  "report_prompt": "INSTRUCTIONS FOR REPORT GENERATION:\n\n1. Output Format:\n   - Return a valid JSON object using the EXACT structure shown below.\n\n2. Scoring Rules:\n   - Recruiter Perspective:\n       * COV (Coverage): 0 = Topic was not covered, 1 = Topic was covered\n       * INT (Interactivity): 0 = Topic not interactive, 1 = Recruiter made it interactive (practice/demo/role-play)\n       * Recruiter_Score = COV + INT (0–2)\n   - Candidate Perspective:\n       * Candidate_Score (Response Adequacy): 0 = incorrect/no engagement, 1 = partially correct/minimal engagement, 2 = accurate/fully engaged\n\n3. Coverage Rules:\n   - All predefined topics must be present in the JSON even if not addressed in the transcript (use COV = 0, INT = 0, Recruiter_Score = 0, Candidate_Score = 0).\n\n4. Totals at the End:\n   - Recruiter_Total_Earned = sum of Recruiter_Score across all topics\n   - Candidate_Total_Earned = sum of Candidate_Score across all topics\n   - Recruiter_Max = 2 × number_of_topics\n   - Candidate_Max = 2 × number_of_topics\n   - Recruiter_Percentage = (Recruiter_Total_Earned ÷ Recruiter_Max) × 100\n   - Candidate_Percentage = (Candidate_Total_Earned ÷ Candidate_Max) × 100\n\n5. Language:\n   - All output must be in English and strictly based on the transcript, no invented information.\n\nExample Output:\n{\n  \"Interactive Training Session Conducted by Recruiter\": [\n    {\n      \"id\": 1,\n      \"Topic\": \"Regular Sales Call Habit\",\n      \"Topic_Content\": \"Habit of doing regular sales calls.\",\n      \"Topic_Evidence\": \"Recruiter emphasised the importance of regular daily sales calls and asked the candidate for examples.\",\n      \"COV\": 1,\n      \"INT\": 1,\n      \"Recruiter_Score\": 2,\n      \"Candidate_Score\": 2,\n      \"candidate's_response_quality\": \"accurate\",\n      \"Topic_Quality\": \"Fully addressed\"\n    },\n    {\n      \"id\": 2,\n      \"Topic\": \"Active/Energetic Mindset\",\n      \"Topic_Content\": \"A mindset to be active/energetic.\",\n      \"Topic_Evidence\": \"Recruiter discussed importance of staying active and asked candidate to describe how they maintain energy on route.\",\n      \"COV\": 1,\n      \"INT\": 1,\n      \"Recruiter_Score\": 2,\n      \"Candidate_Score\": 1,\n      \"candidate's_response_quality\": \"partially correct\",\n      \"Topic_Quality\": \"Partially addressed\"\n    }\n  ],\n  \"Recruiter_Total_Earned\": 4,\n  \"Candidate_Total_Earned\": 3,\n  \"Recruiter_Max\": 4,\n  \"Candidate_Max\": 4,\n  \"Recruiter_Percentage\": 100,\n  \"Candidate_Percentage\": 75\n}"
+}

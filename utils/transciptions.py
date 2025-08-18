@@ -214,9 +214,11 @@ def process_audio_with_gemini(project_id, location, gcs_uri):
 
 def generate_report(transcription, questionaire):
     """
-    Generates a structured JSON interview report from a transcript using Gemini 1.5/2.5 Pro via ChatVertexAI,
-    based on a provided questionnaire and sample report format. Supports both dict-of-sections and flat list
-    questionnaires, and includes topic_context for ifrst_sales_call.json.
+    Generates a structured JSON report from a transcript using Gemini 1.5/2.5 Pro via ChatVertexAI.
+    Supports:
+    - Pre-call/sales call reports (Pre_Call_Planning / While_in_the_Shop)
+    - Interactive Training Session reports (audio_3.json)
+    - Both dict-of-sections and flat list questionnaires
     """
     script_dir = os.path.dirname(__file__)
     questions_file_path = os.path.join(script_dir, 'questionaires', questionaire)
@@ -228,47 +230,30 @@ def generate_report(transcription, questionaire):
     report_prompt = data["report_prompt"]
     system_prompt = data["auditor_system_prompt"]
 
-    # ------------------------------------------------------------------
-    # Handle both structures: (1) dict of section:topic_list, and (2) flat list of topics
-    # ------------------------------------------------------------------
+    # Handle both structures
     if isinstance(questions, dict):
         questionnaire_text = json.dumps(questions, ensure_ascii=False, indent=2)
     elif isinstance(questions, list):
-        # If only a flat list of topics is provided, wrap them under a generic key
-        questionnaire_text = json.dumps(
-            {"Questions": questions}, ensure_ascii=False, indent=2
-        )
+        questionnaire_text = json.dumps({"Questions": questions}, ensure_ascii=False, indent=2)
     else:
-        raise ValueError(
-            "`questions` must be either a dict (sections) or a list (flat)"
-        )
+        raise ValueError("`questions` must be a dict (sections) or a list (flat)")
 
-    # ------------------------------------------------------------------
-    # If file is 'first_sales_call.json', also include topic_context (detailed descriptions)
-    # ------------------------------------------------------------------
+    # Add topic_context if present
     extra_context_text = ""
-    if questionaire == "first_sales_call.json" and "topic_context" in data:
-        topic_context_text = json.dumps(
-            data["topic_context"], ensure_ascii=False, indent=2
-        )
+    if questionaire in ["audio_2_4_5.json", "audio_3.json"] and "topic_context" in data:
+        topic_context_text = json.dumps(data["topic_context"], ensure_ascii=False, indent=2)
         extra_context_text = f"\n\nTopic Context:\n\"\"\"\n{topic_context_text}\n\"\"\""
-
-    # ------------------------------------------------------------------
 
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(
             content=f"""
 Questionnaire:
-\"\"\"
-{questionnaire_text}
-\"\"\"
+\"\"\"{questionnaire_text}\"\"\"
 {extra_context_text}
 
 Conversational Transcript:
-\"\"\" 
-{transcription}
-\"\"\" 
+\"\"\"{transcription}\"\"\"
 
 {report_prompt}
 """
@@ -321,8 +306,12 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
     """
     Exports all sections of the report into a single Excel sheet.
     Handles both INTERVIEW-type reports (questionnaire_responses, extra_questions, interviewer_feedback, candidate_feedback)
-    and SALES-CALL-type reports (Pre_Call_Planning, While_in_the_Shop, Extra_Topics).
+    and SALES-CALL / Interactive Training reports (Pre_Call_Planning, While_in_the_Shop, Extra_Topics, Interactive Training Session).
+    Adds totals and percentages for Recruiter and Candidate scores.
     """
+    import pandas as pd
+    import xlsxwriter
+
     # Ensure dict
     if isinstance(report_data, str):
         data = json.loads(report_data)
@@ -332,42 +321,59 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
     blocks = []
 
     # -----------------------------------------------------------
-    # SALES-CALL REPORT
+    # SALES-CALL / INTERACTIVE TRAINING REPORT
     # -----------------------------------------------------------
     if "Pre_Call_Planning" in data and "While_in_the_Shop" in data:
         # Pre Call Planning
-        blocks.append((
-            "Pre_Call_Planning",
-            pd.DataFrame(data.get("Pre_Call_Planning", []))
-        ))
+        blocks.append(("Pre_Call_Planning", pd.DataFrame(data.get("Pre_Call_Planning", []))))
         # While in the Shop
+        blocks.append(("While_in_the_Shop", pd.DataFrame(data.get("While_in_the_Shop", []))))
+        # Extra Topics
+        blocks.append(("Extra_Topics", pd.DataFrame(data.get("Extra_Topics", []))))
+
+    # Add Interactive Training Session if exists
+    if "Interactive Training Session Conducted by Recruiter" in data:
         blocks.append((
-            "While_in_the_Shop",
-            pd.DataFrame(data.get("While_in_the_Shop", []))
+            "Interactive Training Session Conducted by Recruiter",
+            pd.DataFrame(data["Interactive Training Session Conducted by Recruiter"])
         ))
-        # Extra Topics (if any)
-        blocks.append((
-            "Extra_Topics",
-            pd.DataFrame(data.get("Extra_Topics", []))
-        ))
+
+        # Calculate totals safely
+        section_topics = data["Interactive Training Session Conducted by Recruiter"]
+        num_topics = len(section_topics)
+
+        recruiter_scores = [t.get("Recruiter_Score", 0) or 0 for t in section_topics]
+        candidate_scores = [t.get("Candidate_Score", 0) or 0 for t in section_topics]
+
+        totals_dict = {
+            "Recruiter_Total_Earned": sum(recruiter_scores),
+            "Recruiter_Max": 2 * num_topics,
+            "Recruiter_Percentage": round(sum(recruiter_scores)/(2*num_topics)*100, 2),
+            "Candidate_Total_Earned": sum(candidate_scores),
+            "Candidate_Max": 2 * num_topics,
+            "Candidate_Percentage": round(sum(candidate_scores)/(2*num_topics)*100, 2)
+        }
+
+        # Optional: Pre_Call_Planning / While_in_the_Shop subtotals
+        if "Pre_Call_Planning" in data:
+            pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
+            totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
+            totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
+        if "While_in_the_Shop" in data:
+            shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
+            totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
+            totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
+
+        blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
     # -----------------------------------------------------------
     # INTERVIEW REPORT (existing logic)
     # -----------------------------------------------------------
-    else:
+    elif "Interview_Questionair_Responses" in data:
         blocks = [
-            (
-                "Interview_Questionair_Responses",
-                pd.DataFrame(data.get("Interview_Questionair_Responses", []))
-            ),
-            (
-                "Extra Questions",
-                pd.DataFrame(data.get("extra_questions", []))
-            ),
-            (
-                "Interviewer Feedback",
-                pd.DataFrame([data.get("interviewer_feedback", {})])
-            ),
+            ("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))),
+            ("Extra Questions", pd.DataFrame(data.get("extra_questions", []))),
+            ("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})]))
         ]
 
         # Candidate Feedback — flatten personality_assessment
@@ -382,8 +388,8 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
         blocks.append(("Candidate Feedback", candidate_df))
 
     # -----------------------------------------------------------
-
     # Write to Excel
+    # -----------------------------------------------------------
     with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
         workbook = writer.book
         worksheet = workbook.add_worksheet("Report")
@@ -391,17 +397,12 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
 
         # Formats
         section_format = workbook.add_format({
-            "bold": True,
-            "font_color": "white",
-            "bg_color": "#4F81BD",
-            "align": "center",
-            "valign": "vcenter"
+            "bold": True, "font_color": "white", "bg_color": "#4F81BD",
+            "align": "center", "valign": "vcenter"
         })
         header_format = workbook.add_format({
-            "bold": True,
-            "bg_color": "#D9E1F2",
-            "align": "center",
-            "valign": "vcenter"
+            "bold": True, "bg_color": "#D9E1F2",
+            "align": "center", "valign": "vcenter"
         })
 
         row_cursor = 0
@@ -418,7 +419,7 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
-                row_cursor += len(df) + 1  # +1 header
+                row_cursor += len(df) + 1
             else:
                 worksheet.write(row_cursor, 0, "(No data)")
                 row_cursor += 1
@@ -431,8 +432,3 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
             worksheet.set_column(col_num, col_num, 20)
 
     print(f"✅ Report exported to {output_file} (single sheet, styled sections)")
-
-
-
-
-
