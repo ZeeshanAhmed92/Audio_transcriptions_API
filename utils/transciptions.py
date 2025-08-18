@@ -236,7 +236,7 @@ def generate_report(transcription, questionaire):
     elif isinstance(questions, list):
         # If only a flat list of topics is provided, wrap them under a generic key
         questionnaire_text = json.dumps(
-            {"Topics": questions}, ensure_ascii=False, indent=2
+            {"Questions": questions}, ensure_ascii=False, indent=2
         )
     else:
         raise ValueError(
@@ -244,7 +244,7 @@ def generate_report(transcription, questionaire):
         )
 
     # ------------------------------------------------------------------
-    # If file is 'ifrst_sales_call.json', also include topic_context (detailed descriptions)
+    # If file is 'first_sales_call.json', also include topic_context (detailed descriptions)
     # ------------------------------------------------------------------
     extra_context_text = ""
     if questionaire == "first_sales_call.json" and "topic_context" in data:
