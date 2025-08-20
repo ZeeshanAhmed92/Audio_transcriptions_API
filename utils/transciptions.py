@@ -265,16 +265,17 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
         # Extra Topics
         blocks.append(("Extra_Topics", pd.DataFrame(data.get("Extra_Topics", []))))
 
-         # Optional: Pre_Call_Planning / While_in_the_Shop subtotals
-        if "Pre_Call_Planning" in data:
-            pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
-            totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
-            totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
-        if "While_in_the_Shop" in data:
-            shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
-            totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
-            totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
+        pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
+        shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
 
+        totals_dict = {
+            "Pre_Call_Planning_Subtotal": sum(pre_scores),
+            "Pre_Call_Planning_Percentage":
+                round(sum(pre_scores) / (2 * len(data["Pre_Call_Planning"])) * 100, 2),
+            "While_in_the_Shop_Subtotal": sum(shop_scores),
+            "While_in_the_Shop_Percentage":
+                round(sum(shop_scores) / (2 * len(data["While_in_the_Shop"])) * 100, 2)
+        }
         blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
     # Add Interactive Training Session if exists
@@ -299,6 +300,7 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
             "Candidate_Max": 2 * num_topics,
             "Candidate_Percentage": round(sum(candidate_scores)/(2*num_topics)*100, 2)
         }
+        blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
     # -----------------------------------------------------------
     # INTERVIEW REPORT (existing logic)
