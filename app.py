@@ -31,7 +31,7 @@ UPLOAD_FOLDER = 'uploads'
 REPORT_FOLDER = 'reports'
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  
 LOCATION = "us-central1"        
-GCS_BUCKET_NAME = "bengali-transcription-bucket"    
+GCS_BUCKET_NAME = "bengali-transcription-bucket1"    
 TEMP_DIR = "temp_uploads"
 GCS_FOLDER_NAME = "Interview_audios"  
 

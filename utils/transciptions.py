@@ -107,70 +107,6 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
 
     return gcs_uris
 
-
-
-# def process_audio_with_gemini(project_id, location, gcs_uri):
-#     """
-#     Processes an audio file using Gemini 2.5 Pro on Vertex AI with a fixed transcription + diarization prompt.
-#     Uses ChatVertexAI with temperature=0 for deterministic, repeatable output.
-#     """
-
-#     # Stable, deterministic, JSON-only prompt
-    # prompt_for_transcription = """
-    #         You are an expert transcription and translation assistant. 
-    #         Your task is to:
-    #         1. Transcribe spoken Bengali into fluent and accurate English.
-    #         2. Diarize the conversation by identifying distinct speakers.
-    #         3. Assign each sentence to the correct speaker by analyzing the context, dialogue flow, and conversational logic — not just based on alternating turns.
-    #         4. Maintain consistent speaker labels throughout the conversation, using 'Interviewer' and 'Candidate'.
-    #         5. Ensure that each transcript line makes logical sense with the preceding and following lines (e.g., questions should be assigned to Interviewer, answers to Candidate).
-    #         6. Keep sentences complete and avoid splitting in unnatural places.
-    #         7. Do not loose any content from the audio.
-
-    #         Think step-by-step before deciding the speaker for each line.
-
-    #         After completing the transcription, go through this checklist before finalizing:
-    #         - ✅ Have all Bengali lines been accurately translated into fluent English?
-    #         - ✅ Are speaker labels ('Interviewer', 'Candidate') used consistently and correctly?
-    #         - ✅ Does each line logically follow from the previous one in terms of who is speaking?
-    #         - ✅ Are there no broken or incomplete sentences?
-    #         - ✅ Is the JSON valid, with proper formatting and escaping of special characters?
-
-    #         Output ONLY a valid JSON string in the following format:
-    #         [
-    #             {
-    #                 "speaker": "Interviewer",
-    #                 "transcript": "Where is your CV? Let me see the CV."
-    #             },
-    #             {
-    #                 "speaker": "Interviewer",
-    #                 "transcript": "Ishak Ali?"
-    #             },
-    #             {
-    #                 "speaker": "Candidate",
-    #                 "transcript": "Yes, sir."
-    #             }
-    #         ]
-    #         """
-
-#     print("Initializing ChatVertexAI with Gemini 2.5 Pro...")
-#     llm = ChatVertexAI(
-#         model="gemini-2.5-pro",
-#         temperature=0.4,
-#         project=project_id,
-#         location=location
-#     )
-
-#     print("Sending request to Gemini model... (This may take a moment)")
-#     try:
-#         result = llm.invoke([
-#             SystemMessage(content=prompt_for_transcription),
-#             HumanMessage(content=f"Transcribe and diarize the audio at: {gcs_uri}")
-#         ])
-#         return result.content
-#     except Exception as e:
-#         return f"An error occurred: {e}"
-
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
     Processes a Bengali audio file using Gemini 2.5 Pro for transcription + diarization + translation.
@@ -309,8 +245,6 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
     and SALES-CALL / Interactive Training reports (Pre_Call_Planning, While_in_the_Shop, Extra_Topics, Interactive Training Session).
     Adds totals and percentages for Recruiter and Candidate scores.
     """
-    import pandas as pd
-    import xlsxwriter
 
     # Ensure dict
     if isinstance(report_data, str):
@@ -330,6 +264,18 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
         blocks.append(("While_in_the_Shop", pd.DataFrame(data.get("While_in_the_Shop", []))))
         # Extra Topics
         blocks.append(("Extra_Topics", pd.DataFrame(data.get("Extra_Topics", []))))
+
+         # Optional: Pre_Call_Planning / While_in_the_Shop subtotals
+        if "Pre_Call_Planning" in data:
+            pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
+            totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
+            totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
+        if "While_in_the_Shop" in data:
+            shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
+            totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
+            totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
+
+        blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
     # Add Interactive Training Session if exists
     if "Interactive Training Session Conducted by Recruiter" in data:
@@ -353,18 +299,6 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
             "Candidate_Max": 2 * num_topics,
             "Candidate_Percentage": round(sum(candidate_scores)/(2*num_topics)*100, 2)
         }
-
-        # Optional: Pre_Call_Planning / While_in_the_Shop subtotals
-        if "Pre_Call_Planning" in data:
-            pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
-            totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
-            totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
-        if "While_in_the_Shop" in data:
-            shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
-            totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
-            totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
-
-        blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
     # -----------------------------------------------------------
     # INTERVIEW REPORT (existing logic)
