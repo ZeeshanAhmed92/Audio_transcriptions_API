@@ -238,12 +238,16 @@ def clean_and_parse_json(raw_text):
         return None
     
 
-def export_report_to_single_excel(report_data, output_file="interview_report2.xlsx"):
+import json
+import pandas as pd
+
+def export_report_to_single_excel(report_data, output_file="interview_report.xlsx"):
     """
     Exports all sections of the report into a single Excel sheet.
-    Handles both INTERVIEW-type reports (questionnaire_responses, extra_questions, interviewer_feedback, candidate_feedback)
-    and SALES-CALL / Interactive Training reports (Pre_Call_Planning, While_in_the_Shop, Extra_Topics, Interactive Training Session).
+    Handles INTERVIEW-type reports, SALES-CALL / Interactive Training reports,
+    and Interactive Training Session sections.
     Adds totals and percentages for Recruiter and Candidate scores.
+    All section headers use blue color.
     """
 
     # Ensure dict
@@ -254,41 +258,37 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
 
     blocks = []
 
-    # -----------------------------------------------------------
+    # ------------------------------
     # SALES-CALL / INTERACTIVE TRAINING REPORT
-    # -----------------------------------------------------------
+    # ------------------------------
     if "Pre_Call_Planning" in data and "While_in_the_Shop" in data:
-        # Pre Call Planning
         blocks.append(("Pre_Call_Planning", pd.DataFrame(data.get("Pre_Call_Planning", []))))
-        # While in the Shop
         blocks.append(("While_in_the_Shop", pd.DataFrame(data.get("While_in_the_Shop", []))))
-        # Extra Topics
         blocks.append(("Extra_Topics", pd.DataFrame(data.get("Extra_Topics", []))))
 
+        # Totals
+        totals_dict = {}
         pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
-        shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
+        totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
+        totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
 
-        totals_dict = {
-            "Pre_Call_Planning_Subtotal": sum(pre_scores),
-            "Pre_Call_Planning_Percentage":
-                round(sum(pre_scores) / (2 * len(data["Pre_Call_Planning"])) * 100, 2),
-            "While_in_the_Shop_Subtotal": sum(shop_scores),
-            "While_in_the_Shop_Percentage":
-                round(sum(shop_scores) / (2 * len(data["While_in_the_Shop"])) * 100, 2)
-        }
+        shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
+        totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
+        totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
+
         blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
 
-    # Add Interactive Training Session if exists
+    # ------------------------------
+    # Interactive Training Session
+    # ------------------------------
     if "Interactive Training Session Conducted by Recruiter" in data:
+        section_topics = data["Interactive Training Session Conducted by Recruiter"]
         blocks.append((
             "Interactive Training Session Conducted by Recruiter",
-            pd.DataFrame(data["Interactive Training Session Conducted by Recruiter"])
+            pd.DataFrame(section_topics)
         ))
 
-        # Calculate totals safely
-        section_topics = data["Interactive Training Session Conducted by Recruiter"]
         num_topics = len(section_topics)
-
         recruiter_scores = [t.get("Recruiter_Score", 0) or 0 for t in section_topics]
         candidate_scores = [t.get("Candidate_Score", 0) or 0 for t in section_topics]
 
@@ -300,32 +300,62 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
             "Candidate_Max": 2 * num_topics,
             "Candidate_Percentage": round(sum(candidate_scores)/(2*num_topics)*100, 2)
         }
-        blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
+        blocks.append(("Interactive Training Totals", pd.DataFrame([totals_dict])))
 
-    # -----------------------------------------------------------
-    # INTERVIEW REPORT (existing logic)
-    # -----------------------------------------------------------
+    # ------------------------------
+    # INTERVIEW REPORT
+    # ------------------------------
     elif "Interview_Questionair_Responses" in data:
-        blocks = [
-            ("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))),
-            ("Extra Questions", pd.DataFrame(data.get("extra_questions", []))),
-            ("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})]))
-        ]
+        # Main interview responses
+        blocks.append(("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))))
+        # Extra questions
+        blocks.append(("Extra Questions", pd.DataFrame(data.get("extra_questions", []))))
+        # Interviewer feedback
+        blocks.append(("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])))
 
         # Candidate Feedback — flatten personality_assessment
         candidate_feedback = data.get("candidate_feedback", {})
         personality = candidate_feedback.get("personality_assessment", {})
         flat_personality = {}
-        for trait, detail in personality.items():
-            flat_personality[f"{trait}_value"] = detail.get("value")
-            flat_personality[f"{trait}_reason"] = detail.get("reason")
+        for category, traits in personality.items():
+            for trait, detail in traits.items():
+                flat_personality[f"{category}_{trait}_value"] = detail.get("value")
+                flat_personality[f"{category}_{trait}_reason"] = detail.get("reason")
         candidate_df = pd.DataFrame([{**candidate_feedback, **flat_personality}])
         candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
         blocks.append(("Candidate Feedback", candidate_df))
 
-    # -----------------------------------------------------------
+        # Totals from interview_coverage
+        predefined = data.get("interview_coverage", {}).get("predefined_questions", {})
+        extra = data.get("interview_coverage", {}).get("extra_questions", {})
+
+        blocks.append(("Predefined Totals", pd.DataFrame([{
+            "Total_predefined_question": predefined.get("Total_predefined_question"),
+            "Questions_asked_by_recruiter_from_pre_defined": predefined.get("Questions_asked_by_recruiter_from_pre_defined"),
+            "Recruiter_Percentage": predefined.get("Recruiter_Percentage"),
+            "Answer_given_by_candidate_against_recruiter_asked_questions": predefined.get("Answer_given_by_candidate_against_recruiter_asked_questions"),
+            "Candidate_Percentage": predefined.get("Candidate_Percentage"),
+        }])))
+
+        blocks.append(("Extra Questions Totals", pd.DataFrame([{
+            "Total_extra_questions": extra.get("Total_extra_questions"),
+            "Helpful_extra_questions": extra.get("Helpful_extra_questions"),
+            "Neutral_extra_questions": extra.get("Neutral_extra_questions"),
+            "Unhelpful_extra_questions": extra.get("Unhelpful_extra_questions"),
+            "Candidate_answered_extra_questions": extra.get("Candidate_answered_extra_questions"),
+        }])))
+
+        blocks.append(("Extra Percentages", pd.DataFrame([{
+            "Helpful_extra_percentage": extra.get("Recruiter_extra_percentages", {}).get("Helpful_extra_percentage"),
+            "Neutral_extra_percentage": extra.get("Recruiter_extra_percentages", {}).get("Neutral_extra_percentage"),
+            "Unhelpful_extra_percentage": extra.get("Recruiter_extra_percentages", {}).get("Unhelpful_extra_percentage"),
+            "Overall_recruiter_extra_percentage": extra.get("Recruiter_extra_percentages", {}).get("Overall_recruiter_extra_percentage"),
+            "Candidate_extra_percentage": extra.get("Candidate_extra_percentage"),
+        }])))
+
+    # ------------------------------
     # Write to Excel
-    # -----------------------------------------------------------
+    # ------------------------------
     with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
         workbook = writer.book
         worksheet = workbook.add_worksheet("Report")
@@ -343,6 +373,9 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
 
         row_cursor = 0
         for section_title, df in blocks:
+            if not isinstance(df, pd.DataFrame):
+                df = pd.DataFrame(df if isinstance(df, (list, dict)) else [])
+
             # Section Title
             worksheet.write(row_cursor, 0, section_title, section_format)
             row_cursor += 1
@@ -355,16 +388,15 @@ def export_report_to_single_excel(report_data, output_file="interview_report2.xl
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
+                # Auto column width
+                for i, col in enumerate(df.columns):
+                    max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                    worksheet.set_column(i, i, max_len)
                 row_cursor += len(df) + 1
             else:
                 worksheet.write(row_cursor, 0, "(No data)")
                 row_cursor += 1
 
-            # Two empty rows
-            row_cursor += 2
+            row_cursor += 1  # Space between blocks
 
-        # Auto column width
-        for col_num in range(worksheet.dim_colmax + 1):
-            worksheet.set_column(col_num, col_num, 20)
-
-    print(f"✅ Report exported to {output_file} (single sheet, styled sections)")
+    print(f"✅ Report exported to {output_file} (all headers in blue)")
