@@ -251,8 +251,8 @@ def generate_report_route():
         return jsonify({"job_id": job_id, "status": "done", "report_excel": os.path.basename(report_excel_path)})
     
     
-    job_upload_chunks_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{data.get("job_id")}", "chunks")
-    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{data.get("job_id")}")
+    job_upload_chunks_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{data.get('job_id')}", "chunks")
+    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{data.get('job_id')}")
 
     # Delete all files in the chunks folder
     if os.path.exists(job_upload_chunks_folder):

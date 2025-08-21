@@ -8,4 +8,4 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["gunicorn", "--bind", ":$PORT", "app:app"]
+CMD ["/bin/bash", "-c", "gunicorn --bind 0.0.0.0:$PORT app:app"]
