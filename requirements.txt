@@ -12,3 +12,4 @@ xlsxwriter
 streamlit
 flask-jwt-extended
 gunicorn
+audioop-lts; python_version>="3.13"
