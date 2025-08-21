@@ -35,8 +35,17 @@ GCS_BUCKET_NAME = "bengali-transcription-bucket1"
 TEMP_DIR = "temp_uploads"
 GCS_FOLDER_NAME = "Interview_audios"  
 
-# openai.api_key = os.getenv("OPENAI_API_KEY")
-os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+if credentials_json and credentials_json.strip().startswith("{"):
+    creds_path = "/tmp/gcp-key.json"
+    creds_dir = os.path.dirname(creds_path)
+    os.makedirs(creds_dir, exist_ok=True)  # Python 3.2+, avoids errors if it already exists
+
+    with open(creds_path, "w") as f:
+        f.write(credentials_json)
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
