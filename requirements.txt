@@ -11,3 +11,4 @@ openpyxl
 xlsxwriter
 streamlit
 flask-jwt-extended
+gunicorn
