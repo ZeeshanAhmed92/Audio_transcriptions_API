@@ -155,6 +155,7 @@ def generate_report(transcription, questionaire):
     - Pre-call/sales call reports (Pre_Call_Planning / While_in_the_Shop)
     - Interactive Training Session reports (audio_3.json)
     - Both dict-of-sections and flat list questionnaires
+    - Handles both 'questions' and 'topics' keys
     """
     script_dir = os.path.dirname(__file__)
     questions_file_path = os.path.join(script_dir, 'questionaires', questionaire)
@@ -162,21 +163,28 @@ def generate_report(transcription, questionaire):
     with open(questions_file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    questions = data["questions"]
+    # 🔹 Prefer `topics` but fallback to `questions`
+    if "topics" in data:
+        items = data["topics"]
+    elif "questions" in data:
+        items = data["questions"]
+    else:
+        raise ValueError("JSON must contain either `topics` or `questions` key")
+
     report_prompt = data["report_prompt"]
     system_prompt = data["auditor_system_prompt"]
 
-    # Handle both structures
-    if isinstance(questions, dict):
-        questionnaire_text = json.dumps(questions, ensure_ascii=False, indent=2)
-    elif isinstance(questions, list):
-        questionnaire_text = json.dumps({"Questions": questions}, ensure_ascii=False, indent=2)
+    # Handle both structures (sections vs flat list)
+    if isinstance(items, dict):
+        questionnaire_text = json.dumps(items, ensure_ascii=False, indent=2)
+    elif isinstance(items, list):
+        questionnaire_text = json.dumps({"Topics": items}, ensure_ascii=False, indent=2)
     else:
-        raise ValueError("`questions` must be a dict (sections) or a list (flat)")
+        raise ValueError("`topics/questions` must be a dict (sections) or a list (flat)")
 
     # Add topic_context if present
     extra_context_text = ""
-    if questionaire in ["audio_2_4_5.json", "audio_3.json"] and "topic_context" in data:
+    if questionaire in ["audio_2_4_5.json", "audio_3.json", "audio_6.json"] and "topic_context" in data:
         topic_context_text = json.dumps(data["topic_context"], ensure_ascii=False, indent=2)
         extra_context_text = f"\n\nTopic Context:\n\"\"\"\n{topic_context_text}\n\"\"\""
 
@@ -184,7 +192,7 @@ def generate_report(transcription, questionaire):
         SystemMessage(content=system_prompt),
         HumanMessage(
             content=f"""
-Questionnaire:
+Questionnaire (Topics):
 \"\"\"{questionnaire_text}\"\"\"
 {extra_context_text}
 
@@ -235,18 +243,15 @@ def clean_and_parse_json(raw_text):
         print(raw_text)
         print("--- Extracted JSON string ---")
         print(raw_json_str)
-        return None
-    
 
-import json
-import pandas as pd
 
 def export_report_to_single_excel(report_data, output_file="interview_report.xlsx"):
     """
     Exports all sections of the report into a single Excel sheet.
     Handles INTERVIEW-type reports, SALES-CALL / Interactive Training reports,
-    and Interactive Training Session sections.
-    Adds totals and percentages for Recruiter and Candidate scores.
+    Interactive Training Session sections, Candidate Self Understanding,
+    and Manager Compliance Assessment.
+    Adds totals and percentages for Recruiter, Candidate, and Manager scores.
     All section headers use blue color.
     """
 
@@ -264,29 +269,63 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
     if "Pre_Call_Planning" in data and "While_in_the_Shop" in data:
         blocks.append(("Pre_Call_Planning", pd.DataFrame(data.get("Pre_Call_Planning", []))))
         blocks.append(("While_in_the_Shop", pd.DataFrame(data.get("While_in_the_Shop", []))))
-        blocks.append(("Extra_Topics", pd.DataFrame(data.get("Extra_Topics", []))))
 
-        # Totals
+        # Add Extra Topics only if present
+        extra_topics = data.get("Extra_Topics", [])
+        if extra_topics:
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
+
         totals_dict = {}
-        pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
-        totals_dict["Pre_Call_Planning_Subtotal"] = sum(pre_scores)
-        totals_dict["Pre_Call_Planning_Percentage"] = round(sum(pre_scores)/(2*len(data["Pre_Call_Planning"]))*100, 2)
 
+        # --- Pre-Call Planning Totals ---
+        pre_scores = [t.get("Topic_Score", 0) or 0 for t in data["Pre_Call_Planning"]]
+        pre_subtotal = sum(pre_scores)
+        pre_max = 2 * len(data["Pre_Call_Planning"])
+        pre_percentage = round((pre_subtotal / pre_max) * 100, 2) if pre_max > 0 else 0.0
+        pre_percentage = min(pre_percentage, 100.0)  # cap at 100
+
+        totals_dict["Pre_Call_Planning_Subtotal"] = pre_subtotal
+        totals_dict["Pre_Call_Planning_Max_Possible_Score"] = pre_max
+        totals_dict["Pre_Call_Planning_Percentage"] = pre_percentage
+
+        # --- While in the Shop Totals ---
         shop_scores = [t.get("Topic_Score", 0) or 0 for t in data["While_in_the_Shop"]]
-        totals_dict["While_in_the_Shop_Subtotal"] = sum(shop_scores)
-        totals_dict["While_in_the_Shop_Percentage"] = round(sum(shop_scores)/(2*len(data["While_in_the_Shop"]))*100, 2)
+        shop_subtotal = sum(shop_scores)
+        shop_max = 2 * len(data["While_in_the_Shop"])
+        shop_percentage = round((shop_subtotal / shop_max) * 100, 2) if shop_max > 0 else 0.0
+        shop_percentage = min(shop_percentage, 100.0)  # cap at 100
+
+        totals_dict["While_in_the_Shop_Subtotal"] = shop_subtotal
+        totals_dict["While_in_the_Shop_Max_Possible_Score"] = shop_max
+        totals_dict["While_in_the_Shop_Percentage"] = shop_percentage
+
+        # --- Extra Topics Totals ---
+        if extra_topics:
+            extra_scores = [t.get("Topic_Score", 0) or 0 for t in extra_topics]
+            extra_subtotal = sum(extra_scores)
+            extra_max = len(extra_topics) * 0.5
+            extra_percentage = round((extra_subtotal / extra_max) * 100, 2) if extra_max > 0 else 0.0
+            # bound extra percentage between 0 and 100
+            if extra_percentage < 0:
+                extra_percentage = 0.0
+            if extra_percentage > 100:
+                extra_percentage = 100.0
+        else:
+            extra_subtotal, extra_max, extra_percentage = 0.0, 0.0, 0.0
+
+        totals_dict["Extra_Topics_Subtotal"] = extra_subtotal
+        totals_dict["Extra_Topics_Max_Possible_Score"] = extra_max
+        totals_dict["Extra_Topics_Percentage"] = extra_percentage
 
         blocks.append(("Totals & Percentages", pd.DataFrame([totals_dict])))
+
 
     # ------------------------------
     # Interactive Training Session
     # ------------------------------
     if "Interactive Training Session Conducted by Recruiter" in data:
         section_topics = data["Interactive Training Session Conducted by Recruiter"]
-        blocks.append((
-            "Interactive Training Session Conducted by Recruiter",
-            pd.DataFrame(section_topics)
-        ))
+        blocks.append(("Interactive Training Session Conducted by Recruiter", pd.DataFrame(section_topics)))
 
         num_topics = len(section_topics)
         recruiter_scores = [t.get("Recruiter_Score", 0) or 0 for t in section_topics]
@@ -295,25 +334,105 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
         totals_dict = {
             "Recruiter_Total_Earned": sum(recruiter_scores),
             "Recruiter_Max": 2 * num_topics,
-            "Recruiter_Percentage": round(sum(recruiter_scores)/(2*num_topics)*100, 2),
+            "Recruiter_Percentage": round((sum(recruiter_scores) / (2 * num_topics)) * 100, 2) if num_topics > 0 else 0,
             "Candidate_Total_Earned": sum(candidate_scores),
             "Candidate_Max": 2 * num_topics,
-            "Candidate_Percentage": round(sum(candidate_scores)/(2*num_topics)*100, 2)
+            "Candidate_Percentage": round((sum(candidate_scores) / (2 * num_topics)) * 100, 2) if num_topics > 0 else 0
         }
+
+        # Handle Extra Topics if present
+        if "Extra_Topics" in data:
+            extra_topics = data["Extra_Topics"]
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
+
+            num_extra = len(extra_topics)
+            recruiter_extra_scores = [t.get("Recruiter_Score", 0) or 0 for t in extra_topics]
+            candidate_extra_scores = [t.get("Candidate_Score", 0) or 0 for t in extra_topics]
+
+            totals_dict.update({
+                "Recruiter_Extra_Subtotal": sum(recruiter_extra_scores),
+                "Recruiter_Extra_Max": 1 * num_extra,
+                "Recruiter_Extra_Percentage": round((sum(recruiter_extra_scores) / (1 * num_extra)) * 100, 2) if num_extra > 0 else 0,
+                "Candidate_Extra_Subtotal": sum(candidate_extra_scores),
+                "Candidate_Extra_Max": 0.5 * num_extra,
+                "Candidate_Extra_Percentage": round((sum(candidate_extra_scores) / (0.5 * num_extra)) * 100, 2) if num_extra > 0 else 0
+            })
+
         blocks.append(("Interactive Training Totals", pd.DataFrame([totals_dict])))
+
+
+    # ---------------------------------
+    # CANDIDATE'S UNDERSTANDING REPORT
+    # ---------------------------------
+    if "Candidate_Self_Understanding" in data:
+        section_topics = data["Candidate_Self_Understanding"]
+        blocks.append(("Candidate_Self_Understanding", pd.DataFrame(section_topics)))
+
+        num_topics = len(section_topics)
+        scores = [t.get("Topic_Score", 0) or 0 for t in section_topics]
+        subtotal = sum(scores)
+        max_possible = 2 * num_topics
+        percentage = round((subtotal / max_possible) * 100, 2) if max_possible > 0 else 0.0
+
+        extra_topics = data.get("Extra_Topics", [])
+        extra_scores = [t.get("Topic_Score", 0) or 0 for t in extra_topics]
+        extra_total = sum(extra_scores)
+        extra_max = len(extra_topics) * 0.5 if extra_topics else 0
+        extra_pct = round((extra_total / extra_max) * 100, 2) if extra_max > 0 else 0.0
+
+        totals_dict = {
+            "Subtotal_Score": subtotal,
+            "Max_Possible_Score": max_possible,
+            "Candidate_Understanding_Percentage": percentage,
+            "Extra_Topics_Impact_Score": extra_total,
+            "Extra_Topics_Max_Possible_Score": extra_max,
+            "Extra_Topics_Percentage": extra_pct
+        }
+        blocks.append(("Candidate Understanding Totals", pd.DataFrame([totals_dict])))
+
+        if extra_topics:
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
+
+    # ------------------------------
+    # MANAGER COMPLIANCE REPORT
+    # ------------------------------
+    if "Manager_Compliance_Assessment" in data:
+        section_topics = data["Manager_Compliance_Assessment"]
+        blocks.append(("Manager_Compliance_Assessment", pd.DataFrame(section_topics)))
+
+        num_topics = len(section_topics)
+        scores = [t.get("Topic_Score", 0) or 0 for t in section_topics]
+        subtotal = sum(scores)
+        max_possible = num_topics * 1
+        percentage = round((subtotal / max_possible) * 100, 2) if max_possible > 0 else 0.0
+
+        extra_topics = data.get("Extra_Topics", [])
+        extra_scores = [t.get("Topic_Score", 0) or 0 for t in extra_topics]
+        extra_total = sum(extra_scores)
+        extra_max = len(extra_topics) * 0.5 if extra_topics else 0
+        extra_pct = round((extra_total / extra_max) * 100, 2) if extra_max > 0 else 0.0
+
+        totals_dict = {
+            "Subtotal_Score": subtotal,
+            "Max_Possible_Score": max_possible,
+            "Manager_Compliance_Percentage": percentage,
+            "Extra_Topics_Impact_Score": extra_total,
+            "Extra_Topics_Max_Possible_Score": extra_max,
+            "Extra_Topics_Percentage": extra_pct
+        }
+        blocks.append(("Manager Compliance Totals", pd.DataFrame([totals_dict])))
+
+        if extra_topics:
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
 
     # ------------------------------
     # INTERVIEW REPORT
     # ------------------------------
     elif "Interview_Questionair_Responses" in data:
-        # Main interview responses
         blocks.append(("Interview_Questionair_Responses", pd.DataFrame(data.get("Interview_Questionair_Responses", []))))
-        # Extra questions
         blocks.append(("Extra Questions", pd.DataFrame(data.get("extra_questions", []))))
-        # Interviewer feedback
         blocks.append(("Interviewer Feedback", pd.DataFrame([data.get("interviewer_feedback", {})])))
 
-        # Candidate Feedback — flatten personality_assessment
         candidate_feedback = data.get("candidate_feedback", {})
         personality = candidate_feedback.get("personality_assessment", {})
         flat_personality = {}
@@ -325,7 +444,6 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
         candidate_df.drop(columns=["personality_assessment"], errors="ignore", inplace=True)
         blocks.append(("Candidate Feedback", candidate_df))
 
-        # Totals from interview_coverage
         predefined = data.get("interview_coverage", {}).get("predefined_questions", {})
         extra = data.get("interview_coverage", {}).get("extra_questions", {})
 
@@ -361,7 +479,6 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
         worksheet = workbook.add_worksheet("Report")
         writer.sheets["Report"] = worksheet
 
-        # Formats
         section_format = workbook.add_format({
             "bold": True, "font_color": "white", "bg_color": "#4F81BD",
             "align": "center", "valign": "vcenter"
@@ -376,19 +493,15 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
             if not isinstance(df, pd.DataFrame):
                 df = pd.DataFrame(df if isinstance(df, (list, dict)) else [])
 
-            # Section Title
             worksheet.write(row_cursor, 0, section_title, section_format)
             row_cursor += 1
 
             if not df.empty:
-                # Header row
                 for col_num, col_name in enumerate(df.columns):
                     worksheet.write(row_cursor, col_num, col_name, header_format)
-                # Data rows
                 for r in range(len(df)):
                     for c in range(len(df.columns)):
                         worksheet.write(row_cursor + 1 + r, c, df.iat[r, c])
-                # Auto column width
                 for i, col in enumerate(df.columns):
                     max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
                     worksheet.set_column(i, i, max_len)

@@ -46,7 +46,6 @@ if credentials_json and credentials_json.strip().startswith("{"):
 
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
-
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
 
@@ -66,8 +65,6 @@ if not os.path.exists(JOBS_FILE):
 report_queue = queue.Queue()
 jobs_status = {}  # job_id: {"status": "pending|processing|done|error", "file": filename, "job_folder": ...}
 
-
-
 @app.route("/all_jobs_status")
 @jwt_required()
 def all_jobs_status():
@@ -76,9 +73,6 @@ def all_jobs_status():
 # Job queue
 report_queue = queue.Queue()
 jobs_status = {}  # job_id: {status, file, job_folder, report_excel?, error?}
-
-
-
 
 
 def read_jobs():
@@ -101,6 +95,7 @@ def delete_job_folders(job_id):
 
 
 @app.route("/get_questions", methods=["GET"])
+@jwt_required()
 def get_questions():
     questions_dir = "./utils/questionaires"
     if not os.path.exists(questions_dir):
@@ -113,6 +108,7 @@ def get_questions():
     return jsonify(files)
 
 @app.route("/delete_job/<int:job_id>", methods=["DELETE"])
+@jwt_required()
 def delete_job(job_id):
     jobs = read_jobs()
     updated_jobs = [job for job in jobs if job.get("id") != job_id]
@@ -122,8 +118,6 @@ def delete_job(job_id):
     delete_job_folders(job_id)
     write_jobs(updated_jobs)
     return jsonify({"msg": "Job deleted successfully"}), 200
-
-
 
 def report_worker():
     while True:
@@ -226,6 +220,7 @@ threading.Thread(target=report_worker, daemon=True).start()
 
 
 @app.route("/generate_report", methods=["POST"])
+@jwt_required()
 def generate_report_route():
     data = request.json
     filename = data.get("filename")
@@ -290,13 +285,9 @@ def generate_report_route():
     return jsonify({"job_id": job_id, "status": "queued"})
 
 
-
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
-
 
 
 @app.route('/merged_report', methods=['POST'])
@@ -420,8 +411,6 @@ def create_job():
 
     return jsonify({"msg": "Job created", "job": job})
 
-
-
 # Protected route
 @app.route("/protected")
 @jwt_required()
@@ -469,8 +458,8 @@ def list_files(job_id):
     
     return jsonify(files)
 
-
 @app.route("/report_status/<job_id>")
+@jwt_required()
 def report_status(job_id):
     job = jobs_status.get(job_id)
     if not job:
@@ -487,12 +476,12 @@ def report_status(job_id):
     return jsonify(job)
 
 @app.route("/download_report/<job_id>/<filename>")
+@jwt_required()
 def download_report(job_id, filename):
     job_folder = os.path.join(REPORTS_FOLDER, f"job_{job_id}")
     if not os.path.exists(os.path.join(job_folder, filename)):
         return "File not found", 404
     return send_from_directory(job_folder, filename, as_attachment=True)
-
 
 @app.route("/delete_file/<int:job_id>/<filename>", methods=["DELETE"])
 @jwt_required()
@@ -555,7 +544,6 @@ def list_jobs():
         })
 
     return render_template("jobs.html", jobs=jobs_with_counts)
-
 
 
 if __name__ == '__main__':
