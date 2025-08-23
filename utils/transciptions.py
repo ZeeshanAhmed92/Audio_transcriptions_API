@@ -184,7 +184,7 @@ def generate_report(transcription, questionaire):
 
     # Add topic_context if present
     extra_context_text = ""
-    if questionaire in ["audio_2_4_5.json", "audio_3.json", "audio_6.json"] and "topic_context" in data:
+    if questionaire in ["audio_2_4_5.json", "audio_3.json", "audio_6.json", "audio_7.json"] and "topic_context" in data:
         topic_context_text = json.dumps(data["topic_context"], ensure_ascii=False, indent=2)
         extra_context_text = f"\n\nTopic Context:\n\"\"\"\n{topic_context_text}\n\"\"\""
 
@@ -305,11 +305,7 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
             extra_subtotal = sum(extra_scores)
             extra_max = len(extra_topics) * 0.5
             extra_percentage = round((extra_subtotal / extra_max) * 100, 2) if extra_max > 0 else 0.0
-            # bound extra percentage between 0 and 100
-            if extra_percentage < 0:
-                extra_percentage = 0.0
-            if extra_percentage > 100:
-                extra_percentage = 100.0
+
         else:
             extra_subtotal, extra_max, extra_percentage = 0.0, 0.0, 0.0
 
@@ -368,6 +364,9 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
         section_topics = data["Candidate_Self_Understanding"]
         blocks.append(("Candidate_Self_Understanding", pd.DataFrame(section_topics)))
 
+        if extra_topics:
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
+
         num_topics = len(section_topics)
         scores = [t.get("Topic_Score", 0) or 0 for t in section_topics]
         subtotal = sum(scores)
@@ -390,15 +389,15 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
         }
         blocks.append(("Candidate Understanding Totals", pd.DataFrame([totals_dict])))
 
-        if extra_topics:
-            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
-
     # ------------------------------
     # MANAGER COMPLIANCE REPORT
     # ------------------------------
     if "Manager_Compliance_Assessment" in data:
         section_topics = data["Manager_Compliance_Assessment"]
         blocks.append(("Manager_Compliance_Assessment", pd.DataFrame(section_topics)))
+
+        if extra_topics:
+            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
 
         num_topics = len(section_topics)
         scores = [t.get("Topic_Score", 0) or 0 for t in section_topics]
@@ -421,9 +420,6 @@ def export_report_to_single_excel(report_data, output_file="interview_report.xls
             "Extra_Topics_Percentage": extra_pct
         }
         blocks.append(("Manager Compliance Totals", pd.DataFrame([totals_dict])))
-
-        if extra_topics:
-            blocks.append(("Extra_Topics", pd.DataFrame(extra_topics)))
 
     # ------------------------------
     # INTERVIEW REPORT
