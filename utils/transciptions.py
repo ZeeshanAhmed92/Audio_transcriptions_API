@@ -107,6 +107,51 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
 
     return gcs_uris
 
+
+
+def generate_html(project_id, location,file_path):
+    """
+    Process merged report to be able to get html page based on template.
+    """
+    print("Initializing Vertex AI...")
+    vertexai.init(project=project_id, location=location)
+    report = pd.read_excel(file_path)
+    report_json = report.to_json(orient="records", indent=2)
+    model = GenerativeModel("gemini-2.5-pro")
+    with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
+        template = f.read()
+    prompt_for_html = f"""
+    You are an expert Html designer.
+    Your task is to:
+    1. Take the given report and make a html page based on the provided template.
+    2. The template is for design and structure only. Content should only be from report.
+    3. Make sure all the content of report is represented.
+    4. If there is multiple sections in the report then make sure that you make multiple sections by name of same section in the html too.
+    5. Dont make dropdowns. Make it pdf and print friendly.
+
+    Report (Content):
+    \"\"\"{report_json}\"\"\"
+    Template (Design):
+    \"\"\"{template}\"\"\"
+
+    
+    Output ONLY a valid HTML Code, nothing else.
+    Format:
+       <html>...<html>
+    """
+    print("Sending request to Gemini model... (This may take a moment)")
+    try:
+        response = model.generate_content([prompt_for_html])
+        if not getattr(response, "text", None) or not response.text.strip():
+            print("Gemini returned empty output")
+            return None
+
+        return response.text.strip()
+
+    except Exception as e:
+        print(f"❌ Error during Gemini request: {e}")
+        return None
+
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
     Processes a Bengali audio file using Gemini 2.5 Pro for transcription + diarization + translation.
@@ -138,7 +183,7 @@ def process_audio_with_gemini(project_id, location, gcs_uri):
     try:
         response = model.generate_content([prompt_for_transcription, audio_file_part])
         if not getattr(response, "text", None) or not response.text.strip():
-            print("⚠ Gemini returned empty output")
+            print(" Gemini returned empty output")
             return None
 
         return response.text.strip()
@@ -219,7 +264,7 @@ Conversational Transcript:
 
 def clean_and_parse_json(raw_text):
     if not raw_text or not raw_text.strip():
-        print("⚠ No text provided to parse")
+        print(" No text provided to parse")
         return None
 
     # Try fenced code block first

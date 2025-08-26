@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title | default("Candidate Self Understanding — Readout") }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg: #0b1020;
+      --card: #111834;
+      --muted: #555;
+      --text: #000;
+      --accent: #007acc;
+      --ok: #28a745;
+      --warn: #f7c948;
+      --bad: #ff6b6b;
+      --chip: #eee;
+      --border: #ccc;
+      --radius: 8px;
+      --gap: 16px;
+      --max-width: 1200px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:#fff;
+      color:#000;
+      font: 14px/1.6 "Segoe UI", Roboto, Arial, sans-serif;
+      padding: 24px;
+    }
+    .container{max-width:var(--max-width);margin:0 auto}
+    .title{
+      font-size: 26px;
+      font-weight: 800;
+      margin: 6px 0 8px;
+      color:#000;
+    }
+    .subtitle{color:var(--muted);margin:0 0 20px;font-weight:600}
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--gap);
+      margin-bottom:24px;
+    }
+    @media (max-width: 900px){ .kpis{grid-template-columns: repeat(2, 1fr)} }
+    @media (max-width: 480px){ .kpis{grid-template-columns: 1fr} }
+
+    .card{
+      background:#fdfdfd;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding:16px;
+    }
+    .kpi-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+    .kpi-value{font-size:22px;font-weight:700;margin-top:6px}
+    .kpi-sub{color:var(--muted);font-size:12px;margin-top:4px}
+
+    .topics{display:grid;grid-template-columns: repeat(12, 1fr);gap:var(--gap)}
+    .topic{grid-column: span 6; page-break-inside: avoid; margin-bottom:20px;}
+    @media (max-width: 900px){ .topic{grid-column: span 12} }
+
+    .topic h3{margin:0 0 6px;font-size:16px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+    .chip{
+      padding:4px 8px;border-radius:999px;background:var(--chip);
+      border:1px solid var(--border);font-size:12px;color:#000;
+    }
+    .score.ok{color:var(--ok)}
+    .score.warn{color:var(--warn)}
+    .score.bad{color:var(--bad)}
+
+    .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:720px){ .grid-two{grid-template-columns:1fr} }
+
+    .block{
+      border:1px dashed var(--border);
+      border-radius:6px;
+      padding:10px;
+      font-size:13px;
+    }
+
+    .block.summary-block{margin-top:10px}
+    table{width:100%;border-collapse:collapse;margin-top:20px;border:1px solid var(--border)}
+    th,td{padding:8px 10px;border:1px solid var(--border);font-size:13px}
+    th{background:#f1f1f1;font-weight:700;text-align:left}
+    .footer-note{color:var(--muted);font-size:12px;margin-top:10px}
+
+    /* PRINT OVERRIDES */
+    @media print {
+      body {
+        background:#fff;
+        color:#000;
+        font-size:12pt;
+        padding:0;
+      }
+      .card {
+        border:1px solid #000;
+        box-shadow:none;
+        background:#fff;
+      }
+      .topics .topic {
+        page-break-inside: avoid;
+        border:1px solid #000;
+        padding:12px;
+      }
+      .kpis { page-break-after: always; }
+      .footer-note { color:#000; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p class="subtitle">{{ subtitle | default("Candidate_Self_Understanding") }}</p>
+    <h1 class="title">{{ title | default("Candidate Self Understanding — Readout") }}</h1>
+
+    <!-- KPI summary -->
+    <section class="kpis">
+      <div class="card"><div class="kpi-label">Subtotal Score</div><div class="kpi-value">{{ kpis.Subtotal_Score }}</div></div>
+      <div class="card"><div class="kpi-label">Max Possible</div><div class="kpi-value">{{ kpis.Max_Possible_Score }}</div></div>
+      <div class="card"><div class="kpi-label">Understanding %</div><div class="kpi-value">{{ kpis.Candidate_Understanding_Percentage }}</div></div>
+      <div class="card"><div class="kpi-label">Topics Covered</div><div class="kpi-value">{{ rows | length }}</div></div>
+    </section>
+
+    <!-- Topics grid -->
+    <section class="topics">
+      {%- for row in rows %}
+      <article class="card topic">
+        <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+        <div class="meta">
+          <span class="chip score {{ 'ok' if row.Topic_Score==2 else 'warn' if row.Topic_Score==1 else 'bad' }}">Score: {{ row.Topic_Score }}</span>
+          <span class="chip">{{ row.Topic_Quality | e }}</span>
+        </div>
+
+        <div class="grid-two">
+          <div class="block">
+            <div><strong>Topic Content:</strong></div>
+            <div>{{ row.Topic_Content | e }}</div>
+          </div>
+          <div class="block">
+            <div><strong>Reason for Quality:</strong></div>
+            <div>{{ row.Reason_for_Topic_quality | e }}</div>
+          </div>
+        </div>
+
+        <div class="block" style="margin-top:10px">
+          <strong>Candidate Evidence:</strong>
+          <div>{{ row.Topic_Evidence | e }}</div>
+        </div>
+
+        <div class="block summary-block">
+          <strong>Summary:</strong>
+          <div>{{ row.Summary | e }}</div>
+        </div>
+      </article>
+      {%- endfor %}
+    </section>
+
+    <!-- Compact table -->
+    <section class="card" style="margin-top:20px">
+      <h3>Compact Table View</h3>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Topic</th><th>Score</th><th>Quality</th><th>Summary</th></tr>
+        </thead>
+        <tbody>
+          {%- for row in rows %}
+          <tr>
+            <td>{{ row.id | e }}</td>
+            <td>{{ row.Topic | e }}</td>
+            <td>{{ row.Topic_Score | e }}</td>
+            <td>{{ row.Topic_Quality | e }}</td>
+            <td>{{ row.Summary | e }}</td>
+          </tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+      <p class="footer-note">Cards show detailed narratives. Table gives a quick overview.</p>
+    </section>
+  </div>
+</body>
+</html>

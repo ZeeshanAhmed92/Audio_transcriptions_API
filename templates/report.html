@@ -174,9 +174,21 @@
 <ul id="fileList" class="file-list"></ul>
 <button id="generateSelectedBtn" disabled>Generate Selected</button>
 <button id="mergedReportBtn" disabled>Get Merged Report</button>
+<button id="downloadPdfBtn" disabled>Download PDF</button>
+<span id="pdfSpinner" style="display:none; margin-left:10px;">
+    <span class="spinner"></span> Generating...
+</span>
 </div>
 
 <script>
+
+
+const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+const pdfSpinner = document.getElementById("pdfSpinner");
+
+
+
+    
 document.addEventListener("DOMContentLoaded", () => {
     const jobId = "{{ job_id }}";
     const POLL_INTERVAL = 5000;
@@ -188,7 +200,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const refreshBtn = document.getElementById("refreshBtn");
     const generateSelectedBtn = document.getElementById("generateSelectedBtn");
     const mergedReportBtn = document.getElementById("mergedReportBtn");
+    downloadPdfBtn.addEventListener("click", async () => {
+    pdfSpinner.style.display = "inline-block";  // Show spinner
+    downloadPdfBtn.disabled = true;
 
+    try {
+        const res = await fetch("/get_pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ job_id: jobId }),
+            credentials: "same-origin"
+        });
+
+        if (!res.ok) {
+            let msg = "Failed to generate PDF";
+            try { 
+                const j = await res.json(); 
+                if (j.error) msg = j.error; 
+            } catch {}
+            throw new Error(msg);
+        }
+
+        // Extract filename from Content-Disposition header
+        const disp = res.headers.get("Content-Disposition");
+        let filename = `report_${jobId}.html`;
+        const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+        if (m) filename = decodeURIComponent(m[1]);
+
+        // Download blob
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+    } catch (e) {
+        alert(e.message || "Error while generating PDF");
+    } finally {
+        pdfSpinner.style.display = "none";  // Hide spinner
+        downloadPdfBtn.disabled = false;
+    }
+});
     async function fetchQuestionnaires() {
         const res = await fetch("/get_questions", { credentials: "same-origin" });
         questionnaires = await res.json();
@@ -258,12 +314,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function updateButtonStates(){
-        const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-        const statuses = checkboxes.map(cb => fileStatuses[cb.value] || "Idle");
+    const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
+    const statuses = checkboxes.map(cb => fileStatuses[cb.value] || "Idle");
 
-        generateSelectedBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Idle" || s === "Done"));
-        mergedReportBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Done"));
-    }
+    generateSelectedBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Idle" || s === "Done"));
+    mergedReportBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Done"));
+    downloadPdfBtn.disabled = !(!mergedReportBtn.disabled); // enable when merged report button is enabled
+}
 
     async function loadFiles(){
         const res = await fetch(`/list_files/${jobId}`, { credentials:"same-origin" });

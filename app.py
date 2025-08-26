@@ -7,7 +7,7 @@ import json
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload, 
-                                 export_report_to_single_excel)
+                                 export_report_to_single_excel,generate_html)
 import shutil
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Protection
@@ -349,6 +349,39 @@ def merge_reports():
     merged_wb.save(merged_path)
 
     return send_file(merged_path, as_attachment=True)
+
+
+@app.route('/get_pdf', methods=['POST'])
+@jwt_required()
+def get_pdf():
+    data = request.get_json()
+    print(data.get("job_id"))
+    job_id = data.get("job_id")
+    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
+    merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
+    print(merged_path,job_report_folder)
+
+    if not os.path.exists(merged_path):
+        return jsonify({
+            "error": "Merged report not found. Please generate the merged file first."
+        }), 400
+
+
+    html_content = generate_html(PROJECT_ID,LOCATION,merged_path)
+    if not html_content:
+        return jsonify({"error": "Failed to generate HTML"}), 500
+
+    html_output_path = os.path.join(job_report_folder, f"report_{job_id}.html")
+    with open(html_output_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    return send_file(
+        html_output_path,
+        as_attachment=True,
+        download_name=f"report_{job_id}.html",
+        mimetype="text/html"
+    )
+
 
 @app.route("/report/<int:job_id>")
 @jwt_required()
