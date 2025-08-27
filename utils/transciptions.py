@@ -166,7 +166,7 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
 
             if not response or not getattr(response, "content", None):
                 print("⚠️ Gemini returned empty output")
-                return None
+                return (f"This is the response {response}")
 
             return response.content.strip()
 
