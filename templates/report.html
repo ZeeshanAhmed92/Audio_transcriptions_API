@@ -59,7 +59,7 @@
         background-color: #0052cc;
     }
     button {
-        padding: 8px 12px;
+        padding: 10px 12px;
         border: none;
         border-radius: 8px;
         background-color: #0066ff;
@@ -147,10 +147,19 @@
     .delete-btn:hover {
         background-color: #cc2929 !important;
     }
-    #generateSelectedBtn, #mergedReportBtn {
-        margin-top: 10px;
+
+    /* Grouped button block */
+    .button-block {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 20px;
         width: 100%;
     }
+    .button-block button {
+        width: 100%;
+    }
+
     .questionnaire-dropdown {
         margin-left: 8px;
         padding: 4px;
@@ -166,31 +175,32 @@
 <div class="container">
 <h1>Upload Audio</h1>
 <form id="uploadForm">
-<input type="file" name="audio_file" accept="audio/*" required>
-<button type="submit">Upload</button>
+    <input type="file" name="audio_file" accept="audio/*" required>
+    <button type="submit">Upload</button>
 </form>
 <p id="uploadResult"></p>
 
 <h2>Uploaded Files</h2>
 <button id="refreshBtn">Refresh List</button>
 <ul id="fileList" class="file-list"></ul>
-<button id="generateSelectedBtn" disabled>Generate Selected</button>
-<button id="mergedReportBtn" disabled>Get Merged Report</button>
-<button id="downloadPdfBtn" disabled>Download PDF</button>
-<span id="pdfSpinner" style="display:none; margin-left:10px;">
-    <span class="spinner"></span> Generating...
-</span>
+
+<!-- Grouped Buttons -->
+<div class="button-block">
+    <button id="generateSelectedBtn" disabled>Generate Selected</button>
+    <button id="mergedReportBtn" disabled>Get Merged Report</button>
+    <button id="downloadPdfBtn" disabled>Download PDF</button>
+    <span id="pdfSpinner" style="display:none; margin-left:10px;">
+        <span class="spinner"></span> Generating...
+    </span>
+</div>
 </div>
 
-<script>
 
+<script>
 
 const downloadPdfBtn = document.getElementById("downloadPdfBtn");
 const pdfSpinner = document.getElementById("pdfSpinner");
 
-
-
-    
 document.addEventListener("DOMContentLoaded", () => {
     const jobId = "{{ job_id }}";
     const POLL_INTERVAL = 5000;
