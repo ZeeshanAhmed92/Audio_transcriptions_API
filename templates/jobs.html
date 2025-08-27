@@ -5,20 +5,25 @@
     <title>Job Management</title>
     <style>
         body {
-            background-color: #121212;
-            color: white;
-            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            color: rgb(0, 0, 0);
+            font-family: Arial, sans-serif;
+            background: url("/static/images/Transcriptions.jpeg") no-repeat center center fixed;
+            background-size: cover;
         }
+
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 1rem;
-            background-color: #1e1e1e;
-            border-bottom: 1px solid #333;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(30,30,30,0.7));
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
         }
+
         button.logout-btn {
             background-color: #ff4d4d;
             color: white;
@@ -41,12 +46,14 @@
             text-align: left;
         }
         a.job-link {
-            color: white;
+            color: black;
             text-decoration: none;
         }
         a.job-link:hover {
             text-decoration: underline;
+            color: #222; /* optional: darker hover effect */
         }
+
         .counts {
             font-size: 0.85rem;
             color: #aaa;
@@ -153,9 +160,9 @@
         </thead>
         <tbody id="jobsList">
         {% for job in jobs %}
-        <tr data-id="{{ job.id }}">
-            <td>
-                <a href="/report/{{ job.id }}" class="job-link">
+        <tr data-id="{{ job.id }}" color="black">
+            <td color="black">
+                <a href="/report/{{ job.id }}" class="job-link" color="black">
                     {{ job.name }}
                     <span class="counts">
                         ({{ job.total_audios }} audios, {{ job.active_runs }} running)

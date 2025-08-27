@@ -7,7 +7,7 @@ import json
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload, 
-                                 export_report_to_single_excel,generate_html)
+                                 export_report_to_excel, generate_html)
 import shutil
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Protection
@@ -194,7 +194,7 @@ def report_worker():
                 if report_json:
                     with open(report_json_path, "w", encoding="utf-8") as f:
                         json.dump(report_json, f, ensure_ascii=False, indent=4)
-                    export_report_to_single_excel(report_json, report_excel_path)
+                    export_report_to_excel(report_json, report_excel_path)
                     meta["report_done"] = True
                     with open(meta_path, "w") as f:
                         json.dump(meta, f, indent=4)
@@ -243,7 +243,7 @@ def generate_report_route():
 
     report_folder = os.path.join(REPORT_FOLDER, f"job_{job_id_folder}")
     os.makedirs(report_folder, exist_ok=True)
-    report_excel_path = os.path.join(report_folder, f"{filename}_interview_report.xlsx")
+    report_excel_path = os.path.join(report_folder, f"{filename}_evaluation_report.xlsx")
     if os.path.exists(report_excel_path)and meta.get("questionaire") == questionaire:
         job_id = str(uuid.uuid4())
         jobs_status[job_id] = {
@@ -269,8 +269,8 @@ def generate_report_route():
     files_to_delete = [
         os.path.join(job_report_folder, f"{filename}_meta.json"),
         os.path.join(job_report_folder, f"{filename}transcription.json"),
-        os.path.join(job_report_folder, f"{filename}_interview_report.json"),
-        os.path.join(job_report_folder, f"{filename}_interview_report.xlsx")
+        os.path.join(job_report_folder, f"{filename}_evaluation_report.json"),
+        os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
     ]
 
     for file_path in files_to_delete:
@@ -305,10 +305,14 @@ def merge_reports():
         return jsonify({"msg": f"Job {job_id} report folder not found"}), 404
 
     merged_wb = Workbook()
-    merged_ws = merged_wb.active
-    merged_ws.title = "Merged Report"
+    merged_ws_report = merged_wb.active
+    merged_ws_report.title = "Merged Report"
 
-    current_row = 1
+    # Create second sheet for merged summaries
+    merged_ws_summary = merged_wb.create_sheet(title="Merged Summary")
+
+    current_row_report = 1
+    current_row_summary = 1
 
     for filename in files:
         report_path = os.path.join(job_report_folder, f"{filename}_interview_report.xlsx")
@@ -317,30 +321,55 @@ def merge_reports():
         
         try:
             wb = load_workbook(report_path)
-            ws = wb.active
 
-            # Header for each file section
-            merged_ws.cell(row=current_row, column=1, value=f"Report for {filename}")
-            merged_ws.cell(row=current_row, column=1).font = Font(bold=True)
-            current_row += 1
+            # -----------------
+            # Merge REPORT sheet
+            # -----------------
+            if "Report" in wb.sheetnames:
+                ws = wb["Report"]
 
-            # Copy cells with formatting
-            for row in ws.iter_rows():
-                for col_index, cell in enumerate(row, start=1):
-                    new_cell = merged_ws.cell(row=current_row, column=col_index, value=cell.value)
-                    
-                    if cell.has_style:
-                        new_cell.font = copy.copy(cell.font)
-                        new_cell.fill = copy.copy(cell.fill)
-                        new_cell.border = copy.copy(cell.border)
-                        new_cell.alignment = copy.copy(cell.alignment)
-                        new_cell.number_format = cell.number_format
-                        new_cell.protection = copy.copy(cell.protection)
+                # Header for each file section
+                merged_ws_report.cell(row=current_row_report, column=1, value=f"Report for {filename}")
+                merged_ws_report.cell(row=current_row_report, column=1).font = Font(bold=True)
+                current_row_report += 1
 
-                current_row += 1
-            
-            # Blank row between reports
-            current_row += 1
+                for row in ws.iter_rows():
+                    for col_index, cell in enumerate(row, start=1):
+                        new_cell = merged_ws_report.cell(row=current_row_report, column=col_index, value=cell.value)
+                        if cell.has_style:
+                            new_cell.font = copy.copy(cell.font)
+                            new_cell.fill = copy.copy(cell.fill)
+                            new_cell.border = copy.copy(cell.border)
+                            new_cell.alignment = copy.copy(cell.alignment)
+                            new_cell.number_format = cell.number_format
+                            new_cell.protection = copy.copy(cell.protection)
+                    current_row_report += 1
+
+                current_row_report += 1  # blank row
+
+            # -----------------
+            # Merge SUMMARY sheet
+            # -----------------
+            if "Summary" in wb.sheetnames:
+                ws_summary = wb["Summary"]
+
+                merged_ws_summary.cell(row=current_row_summary, column=1, value=f"Summary for {filename}")
+                merged_ws_summary.cell(row=current_row_summary, column=1).font = Font(bold=True)
+                current_row_summary += 1
+
+                for row in ws_summary.iter_rows():
+                    for col_index, cell in enumerate(row, start=1):
+                        new_cell = merged_ws_summary.cell(row=current_row_summary, column=col_index, value=cell.value)
+                        if cell.has_style:
+                            new_cell.font = copy.copy(cell.font)
+                            new_cell.fill = copy.copy(cell.fill)
+                            new_cell.border = copy.copy(cell.border)
+                            new_cell.alignment = copy.copy(cell.alignment)
+                            new_cell.number_format = cell.number_format
+                            new_cell.protection = copy.copy(cell.protection)
+                    current_row_summary += 1
+
+                current_row_summary += 1  # blank row
 
         except Exception as e:
             return jsonify({"msg": f"Error reading {report_path}: {str(e)}"}), 500
@@ -502,7 +531,7 @@ def report_status(job_id):
     if job["status"] == "done" and "report_excel" not in job:
         report_folder = job["job_folder"]
         filename = job["file"]
-        report_excel_path = os.path.join(report_folder, f"{filename}_interview_report.xlsx")
+        report_excel_path = os.path.join(report_folder, f"{filename}_evaluation_report.xlsx")
         if os.path.exists(report_excel_path):
             job["report_excel"] = os.path.basename(report_excel_path)
 
@@ -525,8 +554,8 @@ def delete_file(job_id, filename):
         os.path.join(job_upload_folder, filename),
         os.path.join(job_report_folder, f"{filename}_meta.json"),
         os.path.join(job_report_folder, f"{filename}transcription.json"),
-        os.path.join(job_report_folder, f"{filename}_interview_report.json"),
-        os.path.join(job_report_folder, f"{filename}_interview_report.xlsx")
+        os.path.join(job_report_folder, f"{filename}_evaluation_report.json"),
+        os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
     ]
 
     removed = 0
