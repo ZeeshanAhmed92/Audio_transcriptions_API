@@ -157,7 +157,7 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
 
     for attempt in range(1, max_retries + 1):
         try:
-            response = model.generate_content([prompt_for_html], timeout=120)
+            response = model.generate_content([prompt_for_html])
 
             if not getattr(response, "text", None) or not response.text.strip():
                 print("⚠️ Gemini returned empty output")

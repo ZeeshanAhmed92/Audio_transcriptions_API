@@ -12,6 +12,7 @@ import shutil
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Protection
 import copy
+import traceback
 
 load_dotenv()
 os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -383,33 +384,43 @@ def merge_reports():
 @app.route('/get_pdf', methods=['POST'])
 @jwt_required()
 def get_pdf():
-    data = request.get_json()
-    print(data.get("job_id"))
-    job_id = data.get("job_id")
-    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
-    merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
-    print(merged_path,job_report_folder)
+    try:
+        data = request.get_json()
+        print(data.get("job_id"))
+        job_id = data.get("job_id")
 
-    if not os.path.exists(merged_path):
-        return jsonify({
-            "error": "Merged report not found. Please generate the merged file first."
-        }), 400
+        if not job_id:
+            return jsonify({"error": "Missing job_id"}), 400
 
+        job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
+        merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
+        print(merged_path, job_report_folder)
 
-    html_content = generate_html(PROJECT_ID,LOCATION,merged_path)
-    if not html_content:
-        return jsonify({"error": "Failed to generate HTML"}), 500
+        if not os.path.exists(merged_path):
+            return jsonify({
+                "error": "Merged report not found. Please generate the merged file first."
+            }), 400
 
-    html_output_path = os.path.join(job_report_folder, f"report_{job_id}.html")
-    with open(html_output_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        # Call your HTML generator
+        html_content = generate_html(PROJECT_ID, LOCATION, merged_path)
+        if not html_content:
+            return jsonify({"error": "Failed to generate HTML"}), 500
 
-    return send_file(
-        html_output_path,
-        as_attachment=True,
-        download_name=f"report_{job_id}.html",
-        mimetype="text/html"
-    )
+        html_output_path = os.path.join(job_report_folder, f"report_{job_id}.html")
+        with open(html_output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        return send_file(
+            html_output_path,
+            as_attachment=True,
+            download_name=f"report_{job_id}.html",
+            mimetype="text/html"
+        )
+
+    except Exception as e:
+        print("Error in get_pdf:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 
 @app.route("/report/<int:job_id>")
