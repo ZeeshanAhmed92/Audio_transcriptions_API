@@ -8,6 +8,10 @@ from google.cloud import storage
 from langchain_google_vertexai import ChatVertexAI
 from vertexai.generative_models import GenerativeModel, Part
 from langchain_core.messages import SystemMessage, HumanMessage
+import time
+import grpc
+from google.api_core.exceptions import GoogleAPICallError, RetryError
+from vertexai.generative_models import GenerativeModel
 
 def split_audio(file_path: str,
                 chunk_length_ms: int = 5 * 60 * 1000,
@@ -115,49 +119,72 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
     return gcs_uris
 
 
-
-def generate_html(project_id, location,file_path):
+def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
     """
-    Process merged report to be able to get html page based on template.
+    Process merged report to get HTML page based on template.
+    Includes retries + explicit gRPC error handling.
     """
     print("Initializing Vertex AI...")
     vertexai.init(project=project_id, location=location)
+
     report = pd.read_excel(file_path, sheet_name="Merged Report")
     report_json = report.to_json(orient="records", indent=2)
     model = GenerativeModel("gemini-2.5-pro")
+
     with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
         template = f.read()
+
     prompt_for_html = f"""
-    You are an expert Html designer.
+    You are an expert HTML designer.
     Your task is to:
-    1. Take the given report and make a html page based on the provided template.
+    1. Take the given report and make a HTML page based on the provided template.
     2. The template is for design and structure only. Content should only be from report.
     3. Make sure all the content of report is represented.
-    4. If there is multiple sections in the report then make sure that you make multiple sections by name of same section in the html too.
-    5. Dont make dropdowns. Make it pdf and print friendly.
+    4. If there are multiple sections in the report then create multiple sections with the same names in the HTML too.
+    5. Don't make dropdowns. Make it PDF and print friendly.
 
     Report (Content):
     \"\"\"{report_json}\"\"\"
     Template (Design):
     \"\"\"{template}\"\"\"
 
-    
-    Output ONLY a valid HTML Code, nothing else.
+    Output ONLY valid HTML code, nothing else.
     Format:
        <html>...<html>
     """
+
     print("Sending request to Gemini model... (This may take a moment)")
-    try:
-        response = model.generate_content([prompt_for_html])
-        if not getattr(response, "text", None) or not response.text.strip():
-            print("Gemini returned empty output")
-            return None
 
-        return response.text.strip()
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = model.generate_content([prompt_for_html], timeout=120)
 
-    except Exception as e:
-        print(f"❌ Error during Gemini request: {e}")
-        return None
+            if not getattr(response, "text", None) or not response.text.strip():
+                print("⚠️ Gemini returned empty output")
+                return None
+
+            return response.text.strip()
+
+        except grpc.RpcError as e:
+            print(f"❌ [gRPC Error] Attempt {attempt}/{max_retries}")
+            print("   Code:", e.code())
+            print("   Details:", e.details())
+
+        except (GoogleAPICallError, RetryError) as e:
+            print(f"❌ [Vertex AI Error] Attempt {attempt}/{max_retries}: {e}")
+
+        except Exception as e:
+            print(f"❌ [Unexpected Error] Attempt {attempt}/{max_retries}: {e}")
+
+        # Retry if not last attempt
+        if attempt < max_retries:
+            wait = backoff * attempt
+            print(f"⏳ Retrying in {wait} seconds...")
+            time.sleep(wait)
+
+    print("❌ All retries failed. Could not generate HTML.")
+    return None
+
 
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
