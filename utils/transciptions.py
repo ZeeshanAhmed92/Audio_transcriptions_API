@@ -122,18 +122,20 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
 def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
     """
     Process merged report to get HTML page based on template.
-    Includes retries + explicit gRPC error handling.
+    Uses ChatVertexAI (LangChain wrapper) with retries + explicit error handling.
     """
     print("Initializing Vertex AI...")
     vertexai.init(project=project_id, location=location)
 
+    # Read the report
     report = pd.read_excel(file_path, sheet_name="Merged Report")
     report_json = report.to_json(orient="records", indent=2)
-    model = GenerativeModel("gemini-2.5-pro")
 
+    # Load the template
     with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
         template = f.read()
 
+    # Prompt
     prompt_for_html = f"""
     You are an expert HTML designer.
     Your task is to:
@@ -144,26 +146,29 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
     5. Don't make dropdowns. Make it PDF and print friendly.
 
     Report (Content):
-    \"\"\"{report_json}\"\"\"
+    \"\"\"{report_json}\"\"\" 
     Template (Design):
-    \"\"\"{template}\"\"\"
+    \"\"\"{template}\"\"\" 
 
     Output ONLY valid HTML code, nothing else.
     Format:
        <html>...<html>
     """
 
-    print("Sending request to Gemini model... (This may take a moment)")
+    print("Sending request to Gemini (ChatVertexAI)...")
+
+    # Create ChatVertexAI model
+    llm = ChatVertexAI(model="gemini-2.5-pro", temperature=0)
 
     for attempt in range(1, max_retries + 1):
         try:
-            response = model.generate_content([prompt_for_html])
+            response = llm.invoke(prompt_for_html)
 
-            if not getattr(response, "text", None) or not response.text.strip():
+            if not response or not getattr(response, "content", None):
                 print("⚠️ Gemini returned empty output")
                 return None
 
-            return response.text.strip()
+            return response.content.strip()
 
         except grpc.RpcError as e:
             print(f"❌ [gRPC Error] Attempt {attempt}/{max_retries}")
@@ -176,7 +181,6 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
         except Exception as e:
             print(f"❌ [Unexpected Error] Attempt {attempt}/{max_retries}: {e}")
 
-        # Retry if not last attempt
         if attempt < max_retries:
             wait = backoff * attempt
             print(f"⏳ Retrying in {wait} seconds...")
@@ -184,6 +188,7 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
 
     print("❌ All retries failed. Could not generate HTML.")
     return None
+
 
 
 def process_audio_with_gemini(project_id, location, gcs_uri):
