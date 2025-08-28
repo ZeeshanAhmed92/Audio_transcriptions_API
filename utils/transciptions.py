@@ -1,21 +1,20 @@
 import os
 import re
-import json 
+import json
+import time
+import grpc
 import vertexai
 import pandas as pd
 from pydub import AudioSegment
 from google.cloud import storage
 from langchain_google_vertexai import ChatVertexAI
+from vertexai.generative_models import GenerativeModel
 from vertexai.generative_models import GenerativeModel, Part
 from langchain_core.messages import SystemMessage, HumanMessage
-import time
-import grpc
 from google.api_core.exceptions import GoogleAPICallError, RetryError
-from vertexai.generative_models import GenerativeModel
 
-def split_audio(file_path: str,
-                chunk_length_ms: int = 5 * 60 * 1000,
-                target_formats=None):
+
+def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000, target_formats=None):
     """
     Split a WAV/MP3/MP4 file into chunks and export them in one or more formats (wav, mp3).
     If input is MP4, it will be converted to WAV internally before splitting.
@@ -70,8 +69,6 @@ def split_audio(file_path: str,
         result[fmt] = paths
 
     return result
-
-
 
 
 def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name: str) -> str:
@@ -190,7 +187,6 @@ def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
     return None
 
 
-
 def process_audio_with_gemini(project_id, location, gcs_uri):
     """
     Processes a Bengali audio file using Gemini 2.5 Pro for transcription + diarization + translation.
@@ -298,7 +294,6 @@ Conversational Transcript:
     response = chat.invoke(messages)
     report = response.content.strip()
     return report
-
 
 
 def clean_and_parse_json(raw_text):

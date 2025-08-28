@@ -136,8 +136,8 @@ def report_worker():
 
             meta_path = os.path.join(report_job_folder, f"{filename}_meta.json")
             transcription_path = os.path.join(report_job_folder, f"{filename}_transcription.json")
-            report_json_path = os.path.join(report_job_folder, f"{filename}_interview_report.json")
-            report_excel_path = os.path.join(report_job_folder, f"{filename}_interview_report.xlsx")
+            report_json_path = os.path.join(report_job_folder, f"{filename}_evaluation_report.json")
+            report_excel_path = os.path.join(report_job_folder, f"{filename}_evaluation_report.xlsx")
 
             # Load or create metadata
             if os.path.exists(meta_path):
