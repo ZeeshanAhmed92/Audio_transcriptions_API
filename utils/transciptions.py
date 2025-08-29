@@ -5,6 +5,7 @@ import time
 import grpc
 import vertexai
 import pandas as pd
+from jinja2 import Template
 from pydub import AudioSegment
 from google.cloud import storage
 from langchain_google_vertexai import ChatVertexAI
@@ -116,75 +117,129 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
     return gcs_uris
 
 
-def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
+def generate_html(json_data):
     """
-    Process merged report to get HTML page based on template.
-    Uses ChatVertexAI (LangChain wrapper) with retries + explicit error handling.
+    Generates an HTML report from JSON data using a dynamic Jinja2 template.
+    This corrected version fixes the 'str' object error.
     """
-    print("Initializing Vertex AI...")
-    vertexai.init(project=project_id, location=location)
+    # Read the template file content as a string
+    try:
+        with open("./utils/templates/dynamic_report_template.html", "r", encoding="utf-8") as f:
+            template_content = f.read()
+    except FileNotFoundError:
+        print("Error: The HTML template file was not found.")
+        return None
 
-    # Read the report
-    report = pd.read_excel(file_path, sheet_name="Merged Report")
-    report_json = report.to_json(orient="records", indent=2)
+    # Create a Jinja2 Template object from the string content
+    template = Template(template_content)
 
-    # Load the template
-    with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
-        template = f.read()
+    # Prepare data for the template, making sure to handle different report types
+    data_to_render = {
+        'title': json_data.get('title', 'Report Readout'),
+        'subtitle': json_data.get('subtitle', 'Report'),
+        'data': json_data, # Pass the entire JSON for flexibility
+        'kpis': {}
+    }
 
-    # Prompt
-    prompt_for_html = f"""
-    You are an expert HTML designer.
-    Your task is to:
-    1. Take the given report and make a HTML page based on the provided template.
-    2. The template is for design and structure only. Content should only be from report.
-    3. Make sure all the content of report is represented.
-    4. If there are multiple sections in the report then create multiple sections with the same names in the HTML too.
-    5. Don't make dropdowns. Make it PDF and print friendly.
+    # Extract and structure KPIs based on report type
+    if "interview_coverage" in json_data:
+        data_to_render['kpis'] = {
+            "Recruiter Asked %": json_data["interview_coverage"]["predefined_questions"]["Recruiter_Percentage"],
+            "Candidate Answered %": json_data["interview_coverage"]["predefined_questions"]["Candidate_Percentage"],
+            "Helpful Extra Questions": json_data["interview_coverage"]["extra_questions"]["Helpful_extra_questions"],
+            "Interviewer Average Score": json_data["interviewer_feedback"]["average_score"],
+            "Candidate Average Score": json_data["candidate_feedback"]["average_score"]
+        }
+    elif "Pre_Call_Planning" in json_data and "While_in_the_Shop" in json_data:
+        data_to_render['kpis'] = {
+            "Pre-Call Score": json_data.get("Pre_Call_Planning_Subtotal"),
+            "Pre-Call %": json_data.get("Pre_Call_Planning_Percentage"),
+            "While-in-Shop Score": json_data.get("While_in_the_Shop_Subtotal"),
+            "While-in-Shop %": json_data.get("While_in_the_Shop_Percentage")
+        }
+    elif "Scoring_Summary" in json_data:
+        data_to_render['kpis'] = json_data.get('Scoring_Summary')
+    elif "Recruiter_Total_Earned" in json_data:
+        data_to_render['kpis'] = {
+            "Recruiter %": json_data.get('Recruiter_Percentage'),
+            "Candidate %": json_data.get('Candidate_Percentage')
+        }
 
-    Report (Content):
-    \"\"\"{report_json}\"\"\" 
-    Template (Design):
-    \"\"\"{template}\"\"\" 
+    rendered_html = template.render(data_to_render)
+    
+    print(f"HTML report successfully generated")
+    return rendered_html
 
-    Output ONLY valid HTML code, nothing else.
-    Format:
-       <html>...<html>
-    """
 
-    print("Sending request to Gemini (ChatVertexAI)...")
+# def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
+#     """
+#     Process merged report to get HTML page based on template.
+#     Uses ChatVertexAI (LangChain wrapper) with retries + explicit error handling.
+#     """
+#     print("Initializing Vertex AI...")
+#     vertexai.init(project=project_id, location=location)
 
-    # Create ChatVertexAI model
-    llm = ChatVertexAI(model="gemini-2.5-pro", temperature=0)
+#     # Read the report
+#     report = pd.read_excel(file_path, sheet_name="Merged Report")
+#     report_json = report.to_json(orient="records", indent=2)
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            response = llm.invoke(prompt_for_html)
+#     # Load the template
+#     with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
+#         template = f.read()
 
-            if not response or not getattr(response, "content", None):
-                print("⚠️ Gemini returned empty output")
-                return (f"This is the response {response}")
+#     # Prompt
+#     prompt_for_html = f"""
+#     You are an expert HTML designer.
+#     Your task is to:
+#     1. Take the given report and make a HTML page based on the provided template.
+#     2. The template is for design and structure only. Content should only be from report.
+#     3. Make sure all the content of report is represented.
+#     4. If there are multiple sections in the report then create multiple sections with the same names in the HTML too.
+#     5. Don't make dropdowns. Make it PDF and print friendly.
 
-            return response.content.strip()
+#     Report (Content):
+#     \"\"\"{report_json}\"\"\" 
+#     Template (Design):
+#     \"\"\"{template}\"\"\" 
 
-        except grpc.RpcError as e:
-            print(f"❌ [gRPC Error] Attempt {attempt}/{max_retries}")
-            print("   Code:", e.code())
-            print("   Details:", e.details())
+#     Output ONLY valid HTML code, nothing else.
+#     Format:
+#        <html>...<html>
+#     """
 
-        except (GoogleAPICallError, RetryError) as e:
-            print(f"❌ [Vertex AI Error] Attempt {attempt}/{max_retries}: {e}")
+#     print("Sending request to Gemini (ChatVertexAI)...")
 
-        except Exception as e:
-            print(f"❌ [Unexpected Error] Attempt {attempt}/{max_retries}: {e}")
+#     # Create ChatVertexAI model
+#     llm = ChatVertexAI(model="gemini-2.5-pro", temperature=0)
 
-        if attempt < max_retries:
-            wait = backoff * attempt
-            print(f"⏳ Retrying in {wait} seconds...")
-            time.sleep(wait)
+#     for attempt in range(1, max_retries + 1):
+#         try:
+#             response = llm.invoke(prompt_for_html)
 
-    print("❌ All retries failed. Could not generate HTML.")
-    return None
+#             if not response or not getattr(response, "content", None):
+#                 print("⚠️ Gemini returned empty output")
+#                 return (f"This is the response {response}")
+
+#             return response.content.strip()
+
+#         except grpc.RpcError as e:
+#             print(f"❌ [gRPC Error] Attempt {attempt}/{max_retries}")
+#             print("   Code:", e.code())
+#             print("   Details:", e.details())
+
+#         except (GoogleAPICallError, RetryError) as e:
+#             print(f"❌ [Vertex AI Error] Attempt {attempt}/{max_retries}: {e}")
+
+#         except Exception as e:
+#             print(f"❌ [Unexpected Error] Attempt {attempt}/{max_retries}: {e}")
+
+#         if attempt < max_retries:
+#             wait = backoff * attempt
+#             print(f"⏳ Retrying in {wait} seconds...")
+#             time.sleep(wait)
+
+#     print("❌ All retries failed. Could not generate HTML.")
+#     return None
 
 
 def process_audio_with_gemini(project_id, location, gcs_uri):

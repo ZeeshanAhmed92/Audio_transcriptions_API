@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory,make_response,send_file
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response, send_file, send_file
 import threading, queue, os, uuid, json
 import pandas as pd
 import os
@@ -316,7 +316,7 @@ def merge_reports():
     current_row_summary = 1
 
     for filename in files:
-        report_path = os.path.join(job_report_folder, f"{filename}_interview_report.xlsx")
+        report_path = os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
         if not os.path.exists(report_path):
             return jsonify({"msg": f"Report not found for {filename}"}), 404
         
@@ -385,24 +385,25 @@ def merge_reports():
 @jwt_required()
 def get_pdf():
     try:
+        # Get the entire JSON payload from the request
         data = request.get_json()
-        print(data.get("job_id"))
         job_id = data.get("job_id")
+        
+        # The JSON report data is expected to be in a key named 'report_data'
+        json_data = data.get("report_data") 
 
         if not job_id:
             return jsonify({"error": "Missing job_id"}), 400
+        
+        if not json_data:
+            return jsonify({"error": "Missing report_data in JSON payload"}), 400
 
         job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
-        merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
-        print(merged_path, job_report_folder)
+        os.makedirs(job_report_folder, exist_ok=True) # Ensure folder exists
 
-        if not os.path.exists(merged_path):
-            return jsonify({
-                "error": "Merged report not found. Please generate the merged file first."
-            }), 400
-
-        # Call your HTML generator
-        html_content = generate_html(PROJECT_ID, LOCATION, merged_path)
+        # Pass the received JSON dictionary directly to generate_html
+        html_content = generate_html(json_data)
+        
         if not html_content:
             return jsonify({"error": "Failed to generate HTML"}), 500
 
