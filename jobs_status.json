@@ -1,0 +1,37 @@
+{
+    "37e769fe-58df-41e4-bb31-8f18d93aea91": {
+        "status": "done",
+        "file": "Osman Goni 1.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 1.m4a_evaluation_report.xlsx",
+        "report_html": "Osman Goni 1.m4a_evaluation_report.html"
+    },
+    "794ae327-2edb-400d-8e07-e49a63c615fe": {
+        "status": "done",
+        "file": "Osman Goni 3.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 3.m4a_evaluation_report.xlsx",
+        "report_html": "Osman Goni 3.m4a_evaluation_report.html"
+    },
+    "43bf4cfe-2a2f-42a1-b24c-1130b1af683e": {
+        "status": "done",
+        "file": "Osman Goni 6.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 6.m4a_evaluation_report.xlsx",
+        "report_html": "Osman Goni 6.m4a_evaluation_report.html"
+    },
+    "278fc1cf-ece3-48d3-9145-d3be208a3ba2": {
+        "status": "done",
+        "file": "Osman Goni 7.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 7.m4a_evaluation_report.xlsx",
+        "report_html": "Osman Goni 7.m4a_evaluation_report.html"
+    },
+    "67c8c442-62a3-4454-98e9-31e3b5d9834e": {
+        "status": "done",
+        "file": "Osman Goni 4.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 4.m4a_evaluation_report.xlsx",
+        "report_html": "Osman Goni 4.m4a_evaluation_report.html"
+    }
+}

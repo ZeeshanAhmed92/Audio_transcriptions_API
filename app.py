@@ -1,12 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, make_response, send_file, send_file
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response, send_file, render_template_string
 import threading, queue, os, uuid, json
 import pandas as pd
-import os
 import time
-import json
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
-from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload, 
+from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload,
                                  export_report_to_excel, generate_html)
 import shutil
 from openpyxl import load_workbook, Workbook
@@ -15,65 +13,74 @@ import copy
 import traceback
 
 load_dotenv()
+
+# Set base folders and environment variables
 os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 app = Flask(__name__)
-
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_COOKIE_NAME"] = "access_token_cookie"
-app.config["JWT_COOKIE_SECURE"] = False       # True if using HTTPS
-app.config["JWT_COOKIE_CSRF_PROTECT"] = False # optional for simplicity
+app.config["JWT_COOKIE_SECURE"] = False  # True if using HTTPS
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False  # optional for simplicity
 
-
-# Set base folders
 UPLOAD_FOLDER = 'uploads'
 REPORT_FOLDER = 'reports'
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  
-LOCATION = "us-central1"        
-GCS_BUCKET_NAME = "bengali-transcription-bucket1"    
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+LOCATION = "us-central1"
+GCS_BUCKET_NAME = "bengali-transcription-bucket1"
 TEMP_DIR = "temp_uploads"
-GCS_FOLDER_NAME = "Interview_audios"  
+GCS_FOLDER_NAME = "Interview_audios"
+REPORTS_FOLDER = "reports"
+JOBS_STATUS_FILE = "jobs_status.json"
+JOBS_FILE = "jobs.json"
 
+# Set up GCP credentials from environment variable
 credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 if credentials_json and credentials_json.strip().startswith("{"):
     creds_path = "/tmp/gcp-key.json"
     creds_dir = os.path.dirname(creds_path)
-    os.makedirs(creds_dir, exist_ok=True)  # Python 3.2+, avoids errors if it already exists
+    os.makedirs(creds_dir, exist_ok=True)
 
     with open(creds_path, "w") as f:
         f.write(credentials_json)
 
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
+# Create necessary directories
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
+os.makedirs(GCS_FOLDER_NAME, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['REPORT_FOLDER'] = REPORT_FOLDER
-REPORTS_FOLDER = "reports"
 
 jwt = JWTManager(app)
 
-JOBS_FILE = "jobs.json"
-if not os.path.exists(JOBS_FILE):
-    with open(JOBS_FILE, "w") as f:
-        json.dump([], f)
+
+# --- Persistent state for jobs_status ---
+def read_job_statuses():
+    """Reads job statuses from a JSON file."""
+    try:
+        if os.path.exists(JOBS_STATUS_FILE):
+            with open(JOBS_STATUS_FILE, "r") as f:
+                return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return {}
 
 
-# Job queue
+def write_job_statuses(statuses):
+    """Writes job statuses to a JSON file."""
+    with open(JOBS_STATUS_FILE, "w") as f:
+        json.dump(statuses, f, indent=4)
+
+
+# Initialize job statuses from the file at startup
+jobs_status = read_job_statuses()
 report_queue = queue.Queue()
-jobs_status = {}  # job_id: {"status": "pending|processing|done|error", "file": filename, "job_folder": ...}
-
-@app.route("/all_jobs_status")
-@jwt_required()
-def all_jobs_status():
-    return jsonify(jobs_status)
-
-# Job queue
-report_queue = queue.Queue()
-jobs_status = {}  # job_id: {status, file, job_folder, report_excel?, error?}
 
 
 def read_jobs():
@@ -82,9 +89,11 @@ def read_jobs():
             return json.load(f)
     return []
 
+
 def write_jobs(jobs):
     with open(JOBS_FILE, "w") as f:
         json.dump(jobs, f, indent=4)
+
 
 def delete_job_folders(job_id):
     report_path = os.path.join(REPORT_FOLDER, f"job_{job_id}")
@@ -92,7 +101,13 @@ def delete_job_folders(job_id):
 
     for path in [report_path, upload_path]:
         if os.path.exists(path):
-            shutil.rmtree(path)  # Recursively delete folder and contents
+            shutil.rmtree(path)
+
+
+@app.route("/all_jobs_status")
+@jwt_required()
+def all_jobs_status():
+    return jsonify(jobs_status)
 
 
 @app.route("/get_questions", methods=["GET"])
@@ -108,23 +123,49 @@ def get_questions():
     ]
     return jsonify(files)
 
+
 @app.route("/delete_job/<int:job_id>", methods=["DELETE"])
 @jwt_required()
 def delete_job(job_id):
-    jobs = read_jobs()
-    updated_jobs = [job for job in jobs if job.get("id") != job_id]
+    job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
+    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
 
-    if len(updated_jobs) == len(jobs):
-        return jsonify({"msg": "Job not found"}), 404
-    delete_job_folders(job_id)
-    write_jobs(updated_jobs)
-    return jsonify({"msg": "Job deleted successfully"}), 200
+    removed_any = False
+
+    # 🔹 Delete upload folder
+    if os.path.exists(job_upload_folder):
+        shutil.rmtree(job_upload_folder)
+        removed_any = True
+
+    # 🔹 Delete report folder
+    if os.path.exists(job_report_folder):
+        shutil.rmtree(job_report_folder)
+        removed_any = True
+
+    # 🔹 Remove all job statuses for this job_id
+    jobs_to_remove = []
+    for jid, status in list(jobs_status.items()):
+        if str(status.get("job_folder", "")).endswith(f"job_{job_id}"):
+            jobs_to_remove.append(jid)
+
+    for jid in jobs_to_remove:
+        jobs_status.pop(jid, None)
+
+    if jobs_to_remove:
+        write_job_statuses(jobs_status)  # persist changes
+
+    if removed_any or jobs_to_remove:
+        return jsonify({"msg": f"Job {job_id} and related statuses deleted"}), 200
+
+    return jsonify({"msg": "Job not found"}), 404
+
 
 def report_worker():
     while True:
-        job_id, filename, job_id_folder,questionaire = report_queue.get()
+        job_id, filename, job_id_folder, questionaire = report_queue.get()
         try:
             jobs_status[job_id]["status"] = "processing"
+            write_job_statuses(jobs_status)  # Added persistence
             print(f"[Worker] Start job_id={job_id}, file={filename}, folder={job_id_folder}")
 
             audio_path = os.path.join(UPLOAD_FOLDER, f"job_{job_id_folder}", filename)
@@ -138,19 +179,22 @@ def report_worker():
             transcription_path = os.path.join(report_job_folder, f"{filename}_transcription.json")
             report_json_path = os.path.join(report_job_folder, f"{filename}_evaluation_report.json")
             report_excel_path = os.path.join(report_job_folder, f"{filename}_evaluation_report.xlsx")
+            report_html_path = os.path.join(report_job_folder, f"{filename}_evaluation_report.html")
 
             # Load or create metadata
             if os.path.exists(meta_path):
                 with open(meta_path, "r") as f:
                     meta = json.load(f)
             else:
-                meta = {"gcs_uri": None, "transcription_done": False, "report_done": False,"questionaire":questionaire}
-            if meta.get("questionaire")!=questionaire:
-                meta = {"gcs_uri": None, "transcription_done": False, "report_done": False,"questionaire":questionaire}
-    
+                meta = {"gcs_uri": None, "transcription_done": False, "report_done": False, "questionaire": questionaire}
+
+            if meta.get("questionaire") != questionaire:
+                meta = {"gcs_uri": None, "transcription_done": False, "report_done": False, "questionaire": questionaire}
+
             # --- Step 1: Upload to GCS ---
             if not meta.get("gcs_uri"):
                 jobs_status[job_id]["status"] = "Uploading to GCS"
+                write_job_statuses(jobs_status)
                 print(f"[Worker] Uploading {filename} to GCS...")
                 gcs_uris = split_and_upload(GCS_BUCKET_NAME, audio_path, f"{GCS_FOLDER_NAME}/{filename}")
                 meta["gcs_uri"] = gcs_uris
@@ -163,6 +207,7 @@ def report_worker():
             # --- Step 2: Transcription ---
             if not meta.get("transcription_done") or not os.path.exists(transcription_path):
                 jobs_status[job_id]["status"] = "Transcribing Audio"
+                write_job_statuses(jobs_status)
                 print(f"[Worker] Transcribing {filename}...")
                 all_transcriptions = []
                 for uri in meta["gcs_uri"]:
@@ -180,6 +225,7 @@ def report_worker():
                 else:
                     jobs_status[job_id]["status"] = "error"
                     jobs_status[job_id]["error"] = "Transcription failed"
+                    write_job_statuses(jobs_status)
                     continue
             else:
                 print("[Worker] Transcription already done.")
@@ -187,14 +233,18 @@ def report_worker():
             # --- Step 3: Report Generation ---
             if not meta.get("report_done") or not os.path.exists(report_excel_path):
                 jobs_status[job_id]["status"] = "Generating Report"
+                write_job_statuses(jobs_status)
                 print(f"[Worker] Generating report for {filename}...")
                 with open(transcription_path, "r", encoding="utf-8") as f:
                     transcription_json = json.load(f)
-                report_text = generate_report(json.dumps(transcription_json),questionaire)
+                report_text = generate_report(json.dumps(transcription_json), questionaire)
                 report_json = clean_and_parse_json(report_text)
                 if report_json:
                     with open(report_json_path, "w", encoding="utf-8") as f:
                         json.dump(report_json, f, ensure_ascii=False, indent=4)
+
+                    generate_html(report_json, report_html_path)
+
                     export_report_to_excel(report_json, report_excel_path)
                     meta["report_done"] = True
                     with open(meta_path, "w") as f:
@@ -203,22 +253,27 @@ def report_worker():
                 else:
                     jobs_status[job_id]["status"] = "error"
                     jobs_status[job_id]["error"] = "Report generation failed"
+                    write_job_statuses(jobs_status)
                     continue
             else:
                 print("[Worker] Report already generated.")
 
             jobs_status[job_id]["status"] = "done"
             jobs_status[job_id]["report_excel"] = os.path.basename(report_excel_path)
+            jobs_status[job_id]["report_html"] = os.path.basename(report_html_path)
+            write_job_statuses(jobs_status)
         except Exception as e:
             print(f"[Worker] Error: {e}")
-            jobs_status[job_id]["status"] = "error"
-            jobs_status[job_id]["error"] = str(e)
+            traceback.print_exc()
+            if job_id in jobs_status:
+                jobs_status[job_id]["status"] = "error"
+                jobs_status[job_id]["error"] = str(e)
+                write_job_statuses(jobs_status)
         finally:
             report_queue.task_done()
 
 
 threading.Thread(target=report_worker, daemon=True).start()
-
 
 @app.route("/generate_report", methods=["POST"])
 @jwt_required()
@@ -228,61 +283,58 @@ def generate_report_route():
     questionaire = data.get("questionnaire")
     job_id_folder = str(data.get("job_id"))
 
-    if not filename or not job_id_folder:
-        return jsonify({"error": "Filename or job_id missing"}), 400
+    if not filename or not job_id_folder or not questionaire:
+        return jsonify({"error": "Filename, questionnaire, or job_id missing"}), 400
 
     job_upload_folder = os.path.join(UPLOAD_FOLDER, f"job_{job_id_folder}")
     if not os.path.exists(os.path.join(job_upload_folder, filename)):
-        return jsonify({"error": "File not found"}), 404
-
-    # If report already exists, return done
-    report_job_folder = os.path.join(REPORT_FOLDER, f"job_{job_id_folder}")
-    meta_path = os.path.join(report_job_folder, f"{filename}_meta.json")
-    if os.path.exists(meta_path):
-                with open(meta_path, "r") as f:
-                    meta = json.load(f)
+        return jsonify({"error": "Audio file not found"}), 404
 
     report_folder = os.path.join(REPORT_FOLDER, f"job_{job_id_folder}")
     os.makedirs(report_folder, exist_ok=True)
+
+    meta_path = os.path.join(report_folder, f"{filename}_meta.json")
     report_excel_path = os.path.join(report_folder, f"{filename}_evaluation_report.xlsx")
-    if os.path.exists(report_excel_path)and meta.get("questionaire") == questionaire:
-        job_id = str(uuid.uuid4())
-        jobs_status[job_id] = {
-            "status": "done",
-            "file": filename,
-            "job_folder": report_folder,
-            "report_excel": os.path.basename(report_excel_path)
-        }
-        return jsonify({"job_id": job_id, "status": "done", "report_excel": os.path.basename(report_excel_path)})
-    
-    
-    job_upload_chunks_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{data.get('job_id')}", "chunks")
-    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{data.get('job_id')}")
+    report_html_path = os.path.join(report_folder, f"{filename}_evaluation_report.html")
 
-    # Delete all files in the chunks folder
-    if os.path.exists(job_upload_chunks_folder):
-        for f in os.listdir(job_upload_chunks_folder):
-            file_path = os.path.join(job_upload_chunks_folder, f)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+    # Check if a report already exists with the same questionnaire
+    if os.path.exists(meta_path) and os.path.exists(report_excel_path) and os.path.exists(report_html_path):
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+        if meta.get("questionaire") == questionaire:
+            job_id = str(uuid.uuid4())
+            jobs_status[job_id] = {
+                "status": "done",
+                "file": filename,
+                "job_folder": report_folder,
+                "report_excel": os.path.basename(report_excel_path),
+                "report_html": os.path.basename(report_html_path)
+            }
+            write_job_statuses(jobs_status)
+            return jsonify({
+                "job_id": job_id,
+                "status": "done",
+                "report_excel": os.path.basename(report_excel_path),
+                "report_html": os.path.basename(report_html_path)
+            })
 
-    # Delete report files
+    # If the report exists but with a different questionnaire, or if it doesn't exist,
+    # delete previous report files to start a new generation process.
     files_to_delete = [
-        os.path.join(job_report_folder, f"{filename}_meta.json"),
-        os.path.join(job_report_folder, f"{filename}transcription.json"),
-        os.path.join(job_report_folder, f"{filename}_evaluation_report.json"),
-        os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
+        os.path.join(report_folder, f"{filename}_meta.json"),
+        os.path.join(report_folder, f"{filename}_evaluation_report.json"),
+        os.path.join(report_folder, f"{filename}_evaluation_report.xlsx"),
+        os.path.join(report_folder, f"{filename}_evaluation_report.html")
     ]
-
     for file_path in files_to_delete:
         if os.path.exists(file_path):
             os.remove(file_path)
 
-
-    # Otherwise enqueue
+    # Enqueue the job for processing
     job_id = str(uuid.uuid4())
     jobs_status[job_id] = {"status": "pending", "file": filename, "job_folder": report_folder}
-    report_queue.put((job_id, filename, job_id_folder,questionaire))
+    write_job_statuses(jobs_status)
+    report_queue.put((job_id, filename, job_id_folder, questionaire))
     return jsonify({"job_id": job_id, "status": "queued"})
 
 
@@ -319,7 +371,7 @@ def merge_reports():
         report_path = os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
         if not os.path.exists(report_path):
             return jsonify({"msg": f"Report not found for {filename}"}), 404
-        
+
         try:
             wb = load_workbook(report_path)
 
@@ -380,48 +432,79 @@ def merge_reports():
 
     return send_file(merged_path, as_attachment=True)
 
-
-@app.route('/get_pdf', methods=['POST'])
+@app.route('/merged_html_report', methods=['POST'])
 @jwt_required()
-def get_pdf():
-    try:
-        # Get the entire JSON payload from the request
-        data = request.get_json()
-        job_id = data.get("job_id")
-        
-        # The JSON report data is expected to be in a key named 'report_data'
-        json_data = data.get("report_data") 
+def merge_html_reports():
+    data = request.get_json()
+    job_id = data.get("job_id")
+    files = data.get("filenames", [])
 
-        if not job_id:
-            return jsonify({"error": "Missing job_id"}), 400
-        
-        if not json_data:
-            return jsonify({"error": "Missing report_data in JSON payload"}), 400
+    if not job_id or not files:
+        return jsonify({"msg": "job_id and files are required"}), 400
 
-        job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
-        os.makedirs(job_report_folder, exist_ok=True) # Ensure folder exists
+    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
+    if not os.path.exists(job_report_folder):
+        return jsonify({"msg": f"Job {job_id} report folder not found"}), 404
 
-        # Pass the received JSON dictionary directly to generate_html
-        html_content = generate_html(json_data)
-        
-        if not html_content:
-            return jsonify({"error": "Failed to generate HTML"}), 500
+    merged_content = ""
+    for filename in files:
+        report_path = os.path.join(job_report_folder, f"{filename}_evaluation_report.html")
+        if not os.path.exists(report_path):
+            return jsonify({"msg": f"Report not found for {filename}"}), 404
 
-        html_output_path = os.path.join(job_report_folder, f"report_{job_id}.html")
-        with open(html_output_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
+        try:
+            with open(report_path, 'r', encoding='utf-8') as f:
+                content = f.read()
 
-        return send_file(
-            html_output_path,
-            as_attachment=True,
-            download_name=f"report_{job_id}.html",
-            mimetype="text/html"
-        )
+            merged_content += f"""
+            <div class="report-section">
+                <h2>Report for {filename}</h2>
+                {content}
+            </div>
+            """
+        except Exception as e:
+            return jsonify({"msg": f"Error reading {report_path}: {str(e)}"}), 500
 
-    except Exception as e:
-        print("Error in get_pdf:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+    # Create a complete HTML file with the merged content
+    html_template = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Merged Report</title>
+            <style>
+                body {
+                    font-family: sans-serif;
+                    line-height: 1.6;
+                    margin: 20px;
+                }
+                .report-section {
+                    border: 1px solid #ccc;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    border-radius: 8px;
+                    background: #fafafa;
+                }
+                h1, h2 {
+                    color: #333;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Merged Evaluation Report</h1>
+            {{ merged_content | safe }}
+        </body>
+        </html>
+        """
+    final_html = render_template_string(html_template, merged_content=merged_content)
+
+
+    merged_path = os.path.join(job_report_folder, f"merged_{job_id}.html")
+    with open(merged_path, 'w', encoding='utf-8') as f:
+        f.write(final_html)
+
+    return send_file(merged_path, as_attachment=True)
 
 
 @app.route("/report/<int:job_id>")
@@ -448,7 +531,7 @@ def login():
     data = request.json
     username = data.get("username")
     password = data.get("password")
-    
+
     if username == os.getenv('APP_USERNAME') and password == os.getenv('APP_PASSWORD'):
         access_token = create_access_token(identity=username)
         resp = make_response(jsonify({"msg": "Login successful"}))
@@ -459,7 +542,7 @@ def login():
             samesite="Lax"
         )
         return resp
-    
+
     return jsonify({"msg": "Bad username or password"}), 401
 
 
@@ -512,7 +595,7 @@ def upload_audio(job_id):
 
     job_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
     os.makedirs(job_folder, exist_ok=True)
-    
+
     filepath = os.path.join(job_folder, file.filename)
     file.save(filepath)
     return jsonify({"message": "File uploaded successfully"})
@@ -524,12 +607,12 @@ def list_files(job_id):
     job_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
     if not os.path.exists(job_folder):
         return jsonify([])
-    
+
     files = [
         f for f in os.listdir(job_folder)
         if os.path.isfile(os.path.join(job_folder, f))
     ]
-    
+
     return jsonify(files)
 
 @app.route("/report_status/<job_id>")
@@ -549,36 +632,82 @@ def report_status(job_id):
 
     return jsonify(job)
 
-@app.route("/download_report/<job_id>/<filename>")
-@jwt_required()
+from flask import send_from_directory
+
+@app.route("/download_report/<job_id>/<filename>", methods=["GET"])
 def download_report(job_id, filename):
-    job_folder = os.path.join(REPORTS_FOLDER, f"job_{job_id}")
-    if not os.path.exists(os.path.join(job_folder, filename)):
-        return "File not found", 404
+    """Download an Excel report for a specific job."""
+    job_folder = os.path.join(app.config["REPORT_FOLDER"], f"job_{job_id}")
+    file_path = os.path.join(job_folder, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Report not found"}), 404
     return send_from_directory(job_folder, filename, as_attachment=True)
 
-@app.route("/delete_file/<int:job_id>/<filename>", methods=["DELETE"])
-@jwt_required()
-def delete_file(job_id, filename):
-    job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
-    job_report_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
-    files_to_delete = [
-        os.path.join(job_upload_folder, filename),
-        os.path.join(job_report_folder, f"{filename}_meta.json"),
-        os.path.join(job_report_folder, f"{filename}transcription.json"),
-        os.path.join(job_report_folder, f"{filename}_evaluation_report.json"),
-        os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
-    ]
 
-    removed = 0
-    for file_path in files_to_delete:
+@app.route("/download_html_report/<job_id>/<filename>", methods=["GET"])
+def download_html_report(job_id, filename):
+    """Download an HTML report for a specific job."""
+    job_folder = os.path.join(app.config["REPORT_FOLDER"], f"job_{job_id}")
+    file_path = os.path.join(job_folder, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Report not found"}), 404
+    return send_from_directory(job_folder, filename, as_attachment=True)
+
+
+@app.route("/delete_files", methods=["DELETE"])
+@jwt_required()
+def delete_files():
+    data = request.get_json()
+    job_id_folder = data.get("job_id")
+    files = data.get("files", [])
+    if not job_id_folder or not files:
+        return jsonify({"msg": "job_id and files are required"}), 400
+
+    job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id_folder}")
+    job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id_folder}")
+    
+    deleted, not_found = [], []
+
+    # Get a list of all jobs to remove from the jobs_status file
+    jobs_to_remove = []
+    for jid, status in jobs_status.items():
+        if str(status.get("job_folder", "")).endswith(f"job_{job_id_folder}") and status.get("file") in files:
+            jobs_to_remove.append(jid)
+    
+    # Process the files for deletion
+    for filename in files:
+        # 1. Delete audio file
+        file_path = os.path.join(job_upload_folder, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-            removed += 1
+            deleted.append(filename)
+        else:
+            not_found.append(filename)
 
-    if removed > 0:
-        return "", 200
-    return "", 404
+        # 2. Delete all related report files
+        report_base_name = os.path.join(job_report_folder, filename)
+        report_files_to_delete = [
+            f"{report_base_name}_meta.json",
+            f"{report_base_name}_transcription.json",
+            f"{report_base_name}_evaluation_report.json",
+            f"{report_base_name}_evaluation_report.xlsx",
+            f"{report_base_name}_evaluation_report.html"
+        ]
+        for report_file_path in report_files_to_delete:
+            if os.path.exists(report_file_path):
+                os.remove(report_file_path)
+
+    # 3. Clean up the jobs_status dictionary and persist the changes
+    for jid in jobs_to_remove:
+        jobs_status.pop(jid, None)
+    
+    write_job_statuses(jobs_status)
+
+    return jsonify({
+        "deleted": deleted,
+        "not_found": not_found,
+        "msg": f"Files {deleted} deleted successfully."
+    }), 200
 
 
 @app.route("/jobs")

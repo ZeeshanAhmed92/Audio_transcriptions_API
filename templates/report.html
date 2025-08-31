@@ -2,91 +2,161 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Audio Upload & Reports - Job {{ job_id }}</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
+    :root {
+        --bg-color: #1a1a1a;
+        --container-bg: #262626;
+        --text-color: #fff;
+        --primary: #0066ff;
+        --primary-hover: #0052cc;
+        --danger: #ff3333;
+        --danger-hover: #cc2929;
+        --success: #28a745;
+        --secondary: #6c757d;
+    }
+    [data-theme="light"] {
+        --bg-color: #f4f4f4;
+        --container-bg: #fff;
+        --text-color: #000;
+        --primary: #007bff;
+        --primary-hover: #0056b3;
+        --danger: #dc3545;
+        --danger-hover: #a71d2a;
+        --success: #28a745;
+        --secondary: #6c757d;
+    }
+
     body {
         font-family: 'Segoe UI', Tahoma, sans-serif;
-        background: url("/static/images/Transcriptions.jpeg") no-repeat center center fixed;
-        background-size: cover;
+        background: var(--bg-color);
         margin: 0;
         padding: 0;
         display: flex;
         justify-content: center;
         align-items: flex-start;
         min-height: 100vh;
-        color: #fff;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        position: relative;
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
     }
-    
+
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
+        z-index: 1;
+    }
+
+    [data-theme="light"] body::before {
+        background-color: rgba(255, 255, 255, 0.5); /* Light overlay for light theme */
+    }
+
+    .container, #logoutBtn, #themeToggle {
+        z-index: 2; /* Bring content to front of overlay */
+        position: relative;
+    }
+
     .container {
         margin-top: 50px;
-        background-color: #1a1a1a;
-        padding: 30px 40px;
+        background-color: var(--container-bg);
+        padding: 25px 35px;
         border-radius: 12px;
-        box-shadow: 0 0 15px rgba(0,0,0,0.6);
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
         max-width: 700px;
         width: 100%;
+        box-sizing: border-box;
     }
+
     h1, h2 {
         font-weight: 500;
         margin-bottom: 20px;
         text-align: center;
-        color: #fff;
+        color: var(--text-color);
     }
+
     form {
         display: flex;
         flex-direction: column;
         align-items: center;
     }
+
     input[type="file"] {
-        padding: 10px;
+        padding: 8px;
         border: none;
-        border-radius: 8px;
-        background-color: #262626;
+        border-radius: 6px;
+        background-color: #333;
         cursor: pointer;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
         width: 100%;
-        color: #fff;
+        color: var(--text-color);
+        font-size: 13px;
     }
+
     input[type="file"]::file-selector-button {
-        background-color: #0066ff;
+        background-color: var(--primary);
         color: white;
         border: none;
-        padding: 8px 12px;
+        padding: 6px 10px;
         border-radius: 6px;
         cursor: pointer;
+        font-size: 13px;
     }
+
     input[type="file"]::file-selector-button:hover {
-        background-color: #0052cc;
+        background-color: var(--primary-hover);
     }
-    button {
-        padding: 10px 12px;
+
+    /* Buttons */
+    .action-btn {
+        padding: 7px 10px;
         border: none;
-        border-radius: 8px;
-        background-color: #0066ff;
-        color: white;
-        font-size: 14px;
+        border-radius: 6px;
+        font-size: 13px;
         cursor: pointer;
         transition: 0.2s;
+        text-align: center;
+        min-width: 110px;
+        white-space: nowrap;
     }
-    button:disabled {
-        background: #555;
+    
+    .action-btn:disabled {
+        background: #555 !important;
         cursor: not-allowed;
     }
-    button:hover:not(:disabled) {
-        background-color: #0052cc;
+    
+    .action-btn:hover:not(:disabled) {
+        opacity: 0.85;
     }
-    #logoutBtn {
+
+    .primary-btn { background-color: var(--primary); color: white; }
+    .delete-btn { background-color: var(--danger); color: white; }
+    .download-btn { background-color: var(--success); color: white; text-decoration: none; display: inline-block; }
+    .secondary-btn { background-color: var(--secondary); color: white; }
+
+    #logoutBtn, #themeToggle {
         position: absolute;
         top: 20px;
-        right: 20px;
-        background-color: #ff3333;
+        padding: 7px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
     }
-    #logoutBtn:hover {
-        background-color: #cc2929;
-    }
-    #refreshBtn {
-        margin-bottom: 10px;
-    }
+    #logoutBtn { right: 20px; background-color: var(--danger); color: white; }
+    #logoutBtn:hover { background-color: var(--danger-hover); }
+    #themeToggle { left: 20px; background-color: var(--secondary); color: white; }
+
     .file-list {
         margin: 20px 0;
         padding: 0;
@@ -95,111 +165,184 @@
         overflow-y: auto;
         border: 1px solid #333;
         border-radius: 8px;
-        background-color: #262626;
+        background-color: var(--container-bg);
     }
+
     .file-list li {
         padding: 8px 12px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         border-bottom: 1px solid #333;
-        font-size: 14px;
-        color: #fff;
+        font-size: 13px;
+        color: var(--text-color);
     }
-    .file-list li:last-child {
-        border-bottom: none;
-    }
+
+    .file-list li:last-child { border-bottom: none; }
+
     .status {
-        font-size: 14px;
+        font-size: 13px;
         color: #bbb;
-        margin-left: 10px;
+        margin-left: 8px;
         display: flex;
         align-items: center;
     }
+
     .status .spinner {
         border: 2px solid #444;
-        border-top: 2px solid #0066ff;
+        border-top: 2px solid var(--primary);
         border-radius: 50%;
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
         margin-right: 6px;
         animation: spin 1s linear infinite;
     }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+
+    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+
+    .button-row .action-btn {
+        flex: 1; 
+        text-align: center;
+        min-width: 90px; 
+        max-width: 120px;
     }
-    .download-link a {
-        margin-left: 10px;
-        padding: 4px 8px;
-        background: #28a745;
-        color: white;
-        border-radius: 6px;
-        text-decoration: none;
-        font-size: 12px;
-    }
-    .download-link a:hover {
-        background: #1e7e34;
-    }
-    .delete-btn {
-        background-color: #ff3333 !important;
-    }
-    .delete-btn:hover {
-        background-color: #cc2929 !important;
+    .button-row {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-start;
     }
 
-    /* Grouped button block */
-    .button-block {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        margin-top: 20px;
-        width: 100%;
-    }
-    .button-block button {
-        width: 100%;
-    }
 
     .questionnaire-dropdown {
-        margin-left: 8px;
-        padding: 4px;
-        background-color: #1a1a1a;
-        color: white;
+        margin-left: 6px;
+        padding: 3px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
         border: 1px solid #555;
-        border-radius: 6px;
+        border-radius: 5px;
+        font-size: 13px;
     }
+
+    /* Message box */
+    #messageBox {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 6px;
+        text-align: center;
+        display: none;
+        font-size: 13px;
+    }
+    #messageBox i { margin-right: 6px; }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 100;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background-color: var(--container-bg);
+        padding: 18px;
+        border-radius: 10px;
+        width: 280px;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .modal-buttons { display: flex; justify-content: space-around; margin-top: 15px; }
+
+    .button-block .action-btn {
+        flex: 1;
+        min-width: 150px;
+        max-width: 180px;
+        text-align: center;
+    }
+    .button-block {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 18px;
+        width: 100%;
+    }
+
 </style>
 </head>
 <body>
+<button id="themeToggle"><i class="fas fa-adjust"></i> Theme</button>
 <button id="logoutBtn">Logout</button>
 <div class="container">
 <h1>Upload Audio</h1>
 <form id="uploadForm">
     <input type="file" name="audio_file" accept="audio/*" required>
-    <button type="submit">Upload</button>
+    <button type="submit" class="primary-btn action-btn"><i class="fas fa-upload"></i> Upload</button>
 </form>
 <p id="uploadResult"></p>
+<div id="messageBox"></div>
 
 <h2>Uploaded Files</h2>
-<button id="refreshBtn">Refresh List</button>
+<button id="refreshBtn" class="secondary-btn action-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
 <ul id="fileList" class="file-list"></ul>
 
-<!-- Grouped Buttons -->
 <div class="button-block">
-    <button id="generateSelectedBtn" disabled>Generate Selected</button>
-    <button id="mergedReportBtn" disabled>Get Merged Report</button>
-    <button id="downloadPdfBtn" disabled>Download PDF</button>
-    <span id="pdfSpinner" style="display:none; margin-left:10px;">
-        <span class="spinner"></span> Generating...
-    </span>
+    <button id="generateSelectedBtn" class="action-btn primary-btn" disabled><i class="fas fa-cogs"></i> Generate Selected</button>
+    <button id="mergedReportBtn" class="action-btn download-btn" disabled><i class="fas fa-file-excel"></i> Merged Excel</button>
+    <button id="mergedHtmlBtn" class="action-btn download-btn" disabled><i class="fas fa-file-code"></i> Merged HTML</button>
+    <button id="deleteSelectedBtn" class="action-btn delete-btn" disabled><i class="fas fa-trash"></i> Delete Selected</button>
 </div>
 </div>
 
+<div id="confirmModal" class="modal">
+    <div class="modal-content">
+        <p id="confirmMessage"></p>
+        <div class="modal-buttons">
+            <button id="confirmYes" class="action-btn delete-btn"><i class="fas fa-check"></i> Yes</button>
+            <button id="confirmNo" class="action-btn primary-btn"><i class="fas fa-times"></i> No</button>
+        </div>
+    </div>
+</div>
 
 <script>
+const messageBox = document.getElementById("messageBox");
+const confirmModal = document.getElementById("confirmModal");
+const confirmMessage = document.getElementById("confirmMessage");
+const confirmYes = document.getElementById("confirmYes");
+const confirmNo = document.getElementById("confirmNo");
+const themeToggle = document.getElementById("themeToggle");
 
-const downloadPdfBtn = document.getElementById("downloadPdfBtn");
-const pdfSpinner = document.getElementById("pdfSpinner");
+let confirmCallback = null;
+let messageTimeout = null;
+
+function showMessage(message, isError = false) {
+    clearTimeout(messageTimeout);
+    messageBox.style.display = "block";
+    messageBox.innerHTML = isError
+        ? `<i class="fas fa-exclamation-circle"></i> ${message}`
+        : `<i class="fas fa-check-circle"></i> ${message}`;
+    messageBox.style.backgroundColor = isError ? "#ff3333" : "#28a745";
+
+    // Auto-hide after 4s
+    messageTimeout = setTimeout(() => {
+        messageBox.style.display = "none";
+    }, 4000);
+}
+
+function showConfirmModal(message, callback) {
+    confirmMessage.textContent = message;
+    confirmCallback = callback;
+    confirmModal.style.display = "flex";
+}
+
+function hideConfirmModal() {
+    confirmModal.style.display = "none";
+    confirmCallback = null;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     const jobId = "{{ job_id }}";
@@ -207,170 +350,269 @@ document.addEventListener("DOMContentLoaded", () => {
     let fileJobs = {};
     let questionnaires = [];
     let fileStatuses = {};
-
     const logoutBtn = document.getElementById("logoutBtn");
     const refreshBtn = document.getElementById("refreshBtn");
     const generateSelectedBtn = document.getElementById("generateSelectedBtn");
     const mergedReportBtn = document.getElementById("mergedReportBtn");
-    downloadPdfBtn.addEventListener("click", async () => {
-    pdfSpinner.style.display = "inline-block";  // Show spinner
-    downloadPdfBtn.disabled = true;
+    const mergedHtmlBtn = document.getElementById("mergedHtmlBtn");
+    const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+    const buttonBlock = document.querySelector(".button-block");
 
-    try {
-        const res = await fetch("/get_pdf", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ job_id: jobId }),
-            credentials: "same-origin"
-        });
-
-        if (!res.ok) {
-            let msg = "Failed to generate PDF";
-            try { 
-                const j = await res.json(); 
-                if (j.error) msg = j.error; 
-            } catch {}
-            throw new Error(msg);
-        }
-
-        // Extract filename from Content-Disposition header
-        const disp = res.headers.get("Content-Disposition");
-        let filename = `report_${jobId}.html`;
-        const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
-        if (m) filename = decodeURIComponent(m[1]);
-
-        // Download blob
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-
-    } catch (e) {
-        alert(e.message || "Error while generating PDF");
-    } finally {
-        pdfSpinner.style.display = "none";  // Hide spinner
-        downloadPdfBtn.disabled = false;
-    }
-});
-    async function fetchQuestionnaires() {
-        const res = await fetch("/get_questions", { credentials: "same-origin" });
-        questionnaires = await res.json();
-    }
-
-    logoutBtn.addEventListener("click", async () => {
-        await fetch("/logout",{method:"POST", credentials:"same-origin"});
-        window.location.href="/";
+    /* ========== Modal handlers ========== */
+    confirmYes.addEventListener("click", () => {
+        if (confirmCallback) confirmCallback(true);
+        hideConfirmModal();
+    });
+    confirmNo.addEventListener("click", () => {
+        if (confirmCallback) confirmCallback(false);
+        hideConfirmModal();
     });
 
-    document.getElementById("uploadForm").addEventListener("submit", async function(e){
+    /* ========== Theme Toggle ========== */
+    themeToggle.addEventListener("click", () => {
+        const current = document.body.dataset.theme || "dark";
+        document.body.dataset.theme = current === "light" ? "dark" : "light";
+    });
+
+    /* ========== Logout ========== */
+    logoutBtn.addEventListener("click", async () => {
+        await fetch(window.location.origin + "/logout", { method: "POST", credentials: "same-origin" });
+        window.location.href = "/";
+    });
+
+    /* ========== Upload Handling ========== */
+    document.getElementById("uploadForm").addEventListener("submit", async function (e) {
         e.preventDefault();
         const formData = new FormData(e.target);
-        const res = await fetch(`/upload/${jobId}`, { method:"POST", body:formData, credentials:"same-origin" });
+        const res = await fetch(window.location.origin + `/upload/${jobId}`, {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        });
         const data = await res.json();
-        document.getElementById("uploadResult").innerText = data.message || data.error;
+        showMessage(data.message || data.error, !!data.error);
         loadFiles();
     });
 
     refreshBtn.addEventListener("click", loadFiles);
 
+    /* ========== Generate Selected ========== */
     generateSelectedBtn.addEventListener("click", async () => {
         const checkboxes = document.querySelectorAll(".file-checkbox:checked");
-        for(const cb of checkboxes) {
+        for (const cb of checkboxes) {
             const selectedQ = document.getElementById(`q-${cb.value}`).value;
             await initiateJob(cb.value, selectedQ);
         }
     });
 
+    /* ========== Merged Reports ========== */
     mergedReportBtn.addEventListener("click", async () => {
-    const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        if (!selectedFiles.length) return showMessage("Select at least one file.", true);
 
-    try {
-        const res = await fetch("/merged_report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId, filenames: selectedFiles }),
-        credentials: "same-origin"
-        });
+        try {
+            const res = await fetch(window.location.origin + "/merged_report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ job_id: parseInt(jobId), filenames: selectedFiles }),
+                credentials: "same-origin"
+            });
 
-        if (!res.ok) {
-        // Try to read error message if server sent JSON
-        let msg = "Failed to generate merged report";
-        try { const j = await res.json(); if (j.error || j.msg) msg = j.error || j.msg; } catch {}
-        throw new Error(msg);
+            if (!res.ok) {
+                let msg = "Failed to generate merged report";
+                try { const j = await res.json(); msg = j.error || j.msg || msg; } catch {}
+                throw new Error(msg);
+            }
+
+            const disp = res.headers.get("Content-Disposition");
+            let filename = `merged_job_${jobId}.xlsx`;
+            const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+            if (m) filename = decodeURIComponent(m[1]);
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMessage("Merged Excel report downloaded successfully.");
+        } catch (e) {
+            showMessage(e.message || "Failed to generate merged report", true);
         }
-
-        // Get filename from Content-Disposition if present
-        const disp = res.headers.get("Content-Disposition");
-        let filename = `merged_job_${jobId}.xlsx`;
-        const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
-        if (m) filename = decodeURIComponent(m[1]);
-
-        // Download blob
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    } catch (e) {
-        alert(e.message || "Failed to generate merged report");
-    }
     });
 
-    function updateButtonStates(){
-    const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-    const statuses = checkboxes.map(cb => fileStatuses[cb.value] || "Idle");
+    mergedHtmlBtn.addEventListener("click", async () => {
+        const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        if (!selectedFiles.length) return showMessage("Select at least one file.", true);
 
-    generateSelectedBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Idle" || s === "Done"));
-    mergedReportBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Done"));
-    downloadPdfBtn.disabled = !(!mergedReportBtn.disabled); // enable when merged report button is enabled
-}
+        try {
+            const res = await fetch(window.location.origin + "/merged_html_report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ job_id: parseInt(jobId), filenames: selectedFiles }),
+                credentials: "same-origin"
+            });
 
-    async function loadFiles(){
-        const res = await fetch(`/list_files/${jobId}`, { credentials:"same-origin" });
+            if (!res.ok) {
+                let msg = "Failed to generate merged HTML report";
+                try { const j = await res.json(); msg = j.error || msg; } catch {}
+                throw new Error(msg);
+            }
+
+            const disp = res.headers.get("Content-Disposition");
+            let filename = `merged_report_${jobId}.html`;
+            const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+            if (m) filename = decodeURIComponent(m[1]);
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMessage("Merged HTML report downloaded successfully.");
+        } catch (e) {
+            showMessage(e.message || "Error while generating merged HTML report", true);
+        }
+    });
+
+    /* ========== Delete Selected Files ========== */
+    deleteSelectedBtn.addEventListener("click", async () => {
+        const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        if (!selectedFiles.length) {
+            return showMessage("Select at least one file to delete.", true);
+        }
+
+        showConfirmModal(`Delete ${selectedFiles.length} selected files?`, async confirmed => {
+            if (confirmed) {
+                try {
+                    const res = await fetch(window.location.origin + '/delete_files', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            job_id: parseInt(jobId),
+                            files: selectedFiles
+                        }),
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await res.json();
+                    if (res.ok) {
+                        showMessage(`${data.deleted.length} file(s) deleted successfully.`);
+                        
+                        // Clear the front-end state for the deleted files
+                        data.deleted.forEach(deletedFile => {
+                            delete fileStatuses[deletedFile];
+                            delete fileJobs[deletedFile];
+                        });
+                        
+                        if (data.not_found.length > 0) {
+                            showMessage(`Could not find: ${data.not_found.join(", ")}`, true);
+                        }
+                        loadFiles(); // Reload file list
+                    } else {
+                        showMessage(data.msg || "Error deleting files.", true);
+                    }
+                } catch (error) {
+                    console.error("Deletion failed:", error);
+                    showMessage("An error occurred during deletion.", true);
+                }
+            }
+        });
+    });
+
+    /* ========== Helper Functions ========== */
+    async function fetchQuestionnaires() {
+        const res = await fetch(window.location.origin + "/get_questions", { credentials: "same-origin" });
+        questionnaires = await res.json();
+    }
+
+    function updateButtonStates() {
+        const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
+        const statuses = checkboxes.map(cb => fileStatuses[cb.value] || "Idle");
+        generateSelectedBtn.disabled = !(checkboxes.length && statuses.every(s => s === "Idle" || s === "Done"));
+        mergedReportBtn.disabled = !(checkboxes.length && statuses.every(s => s === "Done"));
+        mergedHtmlBtn.disabled = mergedReportBtn.disabled;
+        deleteSelectedBtn.disabled = !checkboxes.length;
+    }
+
+    async function loadFiles() {
+        const res = await fetch(window.location.origin + `/list_files/${jobId}`, { credentials: "same-origin" });
         const files = await res.json();
         const list = document.getElementById("fileList");
         list.innerHTML = "";
 
+        buttonBlock.style.display = files.length ? "flex" : "none";
+
         files.forEach(file => {
             const li = document.createElement("li");
-
-            let qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
+            const qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
 
             li.innerHTML = `
-                <div>
-                    <input type="checkbox" class="file-checkbox" value="${file}"> ${file}
-                    <select class="questionnaire-dropdown" id="q-${file}">
-                        ${qOptions}
-                    </select>
-                    <span class="status" id="status-${file}">Idle</span>
-                </div>
-                <div>
-                    <button class="generate-btn" data-file="${file}">Generate</button>
-                    <span class="download-link" id="download-${file}"></span>
-                    <button class="delete-btn" data-file="${file}">Delete</button>
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <input type="checkbox" class="file-checkbox" value="${file}">
+                        <span style="margin-left:6px; font-weight:500;">${file}</span>
+                        <select class="questionnaire-dropdown" id="q-${file}">
+                            ${qOptions}
+                        </select>
+                        <span class="status" id="status-${file}">Idle</span>
+                    </div>
+                    <div class="button-row">
+                        <button class="generate-btn action-btn primary-btn" data-file="${file}"><i class="fas fa-cogs"></i> Generate</button>
+                        <span id="download-links-${file}"></span>
+                        <button class="delete-btn action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
                 </div>
             `;
 
+
             li.querySelector(".file-checkbox").addEventListener("change", updateButtonStates);
 
-            li.querySelector(".generate-btn").addEventListener("click", async ()=>{ 
+            li.querySelector(".generate-btn").addEventListener("click", async () => {
                 const selectedQ = document.getElementById(`q-${file}`).value;
-                await initiateJob(file, selectedQ); 
+                await initiateJob(file, selectedQ);
             });
-            li.querySelector(".delete-btn").addEventListener("click", async ()=> {
-                if(confirm(`Delete ${file}?`)){
-                    const del = await fetch(`/delete_file/${jobId}/${encodeURIComponent(file)}`, {method:"DELETE", credentials:"same-origin"});
-                    if(del.ok) loadFiles(); else alert("Error deleting file");
-                }
+
+            li.querySelector(".delete-btn").addEventListener("click", () => {
+                showConfirmModal(`Delete ${file}?`, async confirmed => {
+                    if (confirmed) {
+                        try {
+                            const res = await fetch(window.location.origin + '/delete_files', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    job_id: parseInt(jobId),
+                                    files: [file]
+                                }),
+                                credentials: 'same-origin'
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                                showMessage(`File "${file}" deleted successfully.`);
+                                
+                                // Clear the front-end state for the deleted file
+                                delete fileStatuses[file];
+                                delete fileJobs[file];
+                                
+                                loadFiles();
+                            } else {
+                                showMessage(data.msg || "Error deleting file.", true);
+                            }
+                        } catch (error) {
+                            console.error("Deletion failed:", error);
+                            showMessage("An error occurred during deletion.", true);
+                        }
+                    }
+                });
             });
 
             list.appendChild(li);
@@ -380,71 +622,76 @@ document.addEventListener("DOMContentLoaded", () => {
         pollJobStatuses();
     }
 
-    async function initiateJob(file, questionnaire){
+    async function initiateJob(file, questionnaire) {
         const statusEl = document.getElementById(`status-${file}`);
         statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
-        const res = await fetch("/generate_report", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({ filename:file, job_id:jobId, questionnaire: questionnaire }),
-            credentials:"same-origin"
+
+        const res = await fetch(window.location.origin + "/generate_report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename: file, job_id: parseInt(jobId), questionnaire }),
+            credentials: "same-origin"
         });
         const data = await res.json();
-        if(data.job_id) fileJobs[file] = data.job_id;
-        else statusEl.innerText = data.error || "Failed";
+        if (data.job_id) fileJobs[file] = data.job_id;
+        else showMessage(data.error || "Failed to initiate job", true);
         updateButtonStates();
     }
 
-    async function updateFileStatuses(){
-        const res = await fetch("/all_jobs_status", { credentials:"same-origin" });
+    async function updateFileStatuses() {
+        const res = await fetch(window.location.origin + "/all_jobs_status", { credentials: "same-origin" });
         const allJobs = await res.json();
 
-        document.querySelectorAll(".file-checkbox").forEach(fileEl=>{
+        document.querySelectorAll(".file-checkbox").forEach(fileEl => {
             const filename = fileEl.value;
             const statusEl = document.getElementById(`status-${filename}`);
-            const downloadEl = document.getElementById(`download-${filename}`);
+            const downloadLinksEl = document.getElementById(`download-links-${filename}`);
             const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
 
-            const matchingJob = Object.entries(allJobs).find(([jid, job])=>job.file===filename);
-            if(matchingJob){
+            const matchingJob = Object.entries(allJobs).find(([jid, job]) => job.file === filename);
+            if (matchingJob) {
                 const [job_id, jobData] = matchingJob;
                 fileJobs[filename] = job_id;
 
-                if(jobData.status === "done" && jobData.report_excel){
+                if (jobData.status === "done" && jobData.report_excel && jobData.report_html) {
                     statusEl.innerHTML = "Done";
                     fileStatuses[filename] = "Done";
                     generateBtn.disabled = false;
-                    downloadEl.innerHTML = `<a href="/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}">Download</a>`;
+                    downloadLinksEl.innerHTML = `
+                        <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
+                        <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
+                    `;
                     delete fileJobs[filename];
-                } else if(jobData.status === "error"){
+                } else if (jobData.status === "error") {
                     statusEl.innerHTML = "Error: " + (jobData.error || "Failed");
                     fileStatuses[filename] = "Error";
                     generateBtn.disabled = false;
-                    downloadEl.innerHTML = "";
+                    downloadLinksEl.innerHTML = "";
                     delete fileJobs[filename];
                 } else {
                     statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
                     fileStatuses[filename] = jobData.status;
-                    generateBtn.disabled = true; // Disable if not Idle/Done
-                    downloadEl.innerHTML = "";   // Hide download link
+                    generateBtn.disabled = true;
+                    downloadLinksEl.innerHTML = "";
                 }
             } else {
                 statusEl.innerHTML = "Idle";
                 fileStatuses[filename] = "Idle";
                 generateBtn.disabled = false;
-                downloadEl.innerHTML = "";
+                downloadLinksEl.innerHTML = "";
             }
         });
 
         updateButtonStates();
     }
 
-    async function pollJobStatuses(){
+    async function pollJobStatuses() {
         await updateFileStatuses();
         setTimeout(pollJobStatuses, POLL_INTERVAL);
     }
 
-    (async function init(){
+    /* ========== Init ========== */
+    (async function init() {
         await fetchQuestionnaires();
         loadFiles();
     })();

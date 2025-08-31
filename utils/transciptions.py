@@ -116,61 +116,143 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
 
     return gcs_uris
 
-
-def generate_html(json_data):
+def generate_html(json_data, output_path):
     """
-    Generates an HTML report from JSON data using a dynamic Jinja2 template.
-    This corrected version fixes the 'str' object error.
+    Generates an HTML report from JSON data and saves it to a file.
+    Handles all sections and KPIs: Interview, Candidate Self-Understanding,
+    Manager Compliance, Call Evaluation, Interactive Training, Scoring Summary.
     """
-    # Read the template file content as a string
     try:
-        with open("./utils/templates/dynamic_report_template.html", "r", encoding="utf-8") as f:
+        # Assuming the template file is in the same directory as the script.
+        template_file_path = "utils/templates/dynamic_report_template.html"
+        with open(template_file_path, "r", encoding="utf-8") as f:
             template_content = f.read()
     except FileNotFoundError:
         print("Error: The HTML template file was not found.")
-        return None
+        return False
 
-    # Create a Jinja2 Template object from the string content
     template = Template(template_content)
 
-    # Prepare data for the template, making sure to handle different report types
-    data_to_render = {
-        'title': json_data.get('title', 'Report Readout'),
-        'subtitle': json_data.get('subtitle', 'Report'),
-        'data': json_data, # Pass the entire JSON for flexibility
-        'kpis': {}
-    }
+    # Initialize KPIs dictionary
+    kpis = {}
 
-    # Extract and structure KPIs based on report type
-    if "interview_coverage" in json_data:
-        data_to_render['kpis'] = {
-            "Recruiter Asked %": json_data["interview_coverage"]["predefined_questions"]["Recruiter_Percentage"],
-            "Candidate Answered %": json_data["interview_coverage"]["predefined_questions"]["Candidate_Percentage"],
-            "Helpful Extra Questions": json_data["interview_coverage"]["extra_questions"]["Helpful_extra_questions"],
-            "Interviewer Average Score": json_data["interviewer_feedback"]["average_score"],
-            "Candidate Average Score": json_data["candidate_feedback"]["average_score"]
+    # ------------------ Candidate Self-Understanding KPIs ------------------
+    if "Candidate_Self_Understanding" in json_data:
+        # Top-level KPIs
+        kpis["Candidate_Subtotal_Score"] = json_data.get("Candidate_Subtotal_Score", 0)
+        kpis["Max_Possible_Score"] = json_data.get("Max_Possible_Score", 0)
+        kpis["Candidate_Understanding_Percentage"] = json_data.get("Candidate_Understanding_Percentage", 0)
+        kpis["Extra_Topics_Impact_Score"] = json_data.get("Extra_Topics_Impact_Score", 0)
+        kpis["Extra_Topics_Max_Possible_Score"] = json_data.get("Extra_Topics_Max_Possible_Score", 0)
+        kpis["Extra_Topics_Percentage"] = json_data.get("Extra_Topics_Percentage", 0)
+
+    # ------------------ Candidate Self-Understanding KPIs ------------------
+    if "Manager_Compliance_Assessment" in json_data:
+        # Top-level KPIs
+        kpis["Manager_Subtotal_Score"] = json_data.get("Manager_Subtotal_Score", 0)
+        kpis["Max_Possible_Score"] = json_data.get("Max_Possible_Score", 0)
+        kpis["Manager_Compliance_Percentage"] = json_data.get("Manager_Compliance_Percentage", 0)
+        kpis["Extra_Topics_Impact_Score"] = json_data.get("Extra_Topics_Impact_Score", 0)
+        kpis["Extra_Topics_Max_Possible_Score"] = json_data.get("Extra_Topics_Max_Possible_Score", 0)
+        kpis["Extra_Topics_Percentage"] = json_data.get("Extra_Topics_Percentage", 0)
+
+    # ------------------ Call Evaluation KPIs ------------------
+    # The template expects specific key names (`earned`, `max`, `percentage`),
+    # so we map the JSON data to these keys.
+    if "Pre_Call_Planning_Subtotal" in json_data:
+        kpis["Pre_Call_Planning"] = {
+            "earned": json_data.get("Pre_Call_Planning_Subtotal", 0),
+            "max": json_data.get("Pre_Call_Planning_Max_Possible_Score", 0),
+            "percentage": json_data.get("Pre_Call_Planning_Percentage", 0)
         }
-    elif "Pre_Call_Planning" in json_data and "While_in_the_Shop" in json_data:
-        data_to_render['kpis'] = {
-            "Pre-Call Score": json_data.get("Pre_Call_Planning_Subtotal"),
-            "Pre-Call %": json_data.get("Pre_Call_Planning_Percentage"),
-            "While-in-Shop Score": json_data.get("While_in_the_Shop_Subtotal"),
-            "While-in-Shop %": json_data.get("While_in_the_Shop_Percentage")
+    if "While_in_the_Shop_Subtotal" in json_data:
+        kpis["While_in_the_Shop"] = {
+            "earned": json_data.get("While_in_the_Shop_Subtotal", 0),
+            "max": json_data.get("While_in_the_Shop_Max_Possible_Score", 0),
+            "percentage": json_data.get("While_in_the_Shop_Percentage", 0)
         }
-    elif "Scoring_Summary" in json_data:
-        data_to_render['kpis'] = json_data.get('Scoring_Summary')
-    elif "Recruiter_Total_Earned" in json_data:
-        data_to_render['kpis'] = {
-            "Recruiter %": json_data.get('Recruiter_Percentage'),
-            "Candidate %": json_data.get('Candidate_Percentage')
+    if "Extra_Topics_Subtotal" in json_data:
+        kpis["Extra_Topics"] = {
+            "earned": json_data.get("Extra_Topics_Subtotal", 0),
+            "max": json_data.get("Extra_Topics_Max_Possible_Score", 0),
+            "percentage": json_data.get("Extra_Topics_Percentage", 0)
         }
 
-    rendered_html = template.render(data_to_render)
+    # ------------------ Interview Question KPIs ------------------
+    if "Interview_Questionair_Responses" in json_data:
+        coverage = json_data.get("interview_coverage", {})
+        predefined = coverage.get("predefined_questions", {})
+        extra = coverage.get("extra_questions", {})
+
+        # Create flat dictionaries to match the HTML loop structure
+        kpis["Interview_Questions_Predefined"] = {
+            "Total_predefined_questions": predefined.get("Total_predefined_questions", 0),
+            "Questions_asked_by_recruiter_from_pre_defined": predefined.get("Questions_asked_by_recruiter_from_pre_defined", 0),
+            "Recruiter_Percentage": predefined.get("Recruiter_Percentage", 0),
+            "Answer_given_by_candidate_against_recruiter_asked_questions": predefined.get("Answer_given_by_candidate_against_recruiter_asked_questions", 0),
+            "Candidate_Percentage": predefined.get("Candidate_Percentage", 0)
+        }
+        kpis["Interview_Questions_Extra"] = {
+            "Total_extra_questions": extra.get("Total_extra_questions", 0),
+            "Helpful_extra_questions": extra.get("Helpful_extra_questions", 0),
+            "Neutral_extra_questions": extra.get("Neutral_extra_questions", 0),
+            "Unhelpful_extra_questions": extra.get("Unhelpful_extra_questions", 0),
+            "Candidate_answered_extra_questions": extra.get("Candidate_answered_extra_questions", 0),
+            # The template handles recruiter percentages separately, so we include them here.
+            "Recruiter_extra_percentages": extra.get("Recruiter_extra_percentages", {})
+        }
+
+    # ------------------ Interactive Training Session KPIs ------------------
+    if "Interactive Training Session Conducted by Recruiter" in json_data:
+        # Top-level KPIs
+        kpis["Recruiter_Total_Earned"] = json_data.get("Recruiter_Total_Earned", 0)
+        kpis["Recruiter_Max_Score"] = json_data.get("Recruiter_Max_Score", 0)
+        kpis["Recruiter_Percentage"] = json_data.get("Recruiter_Percentage", 0)
+        kpis["Candidate_Total_Earned"] = json_data.get("Candidate_Total_Earned", 0)
+        kpis["Candidate_Max_Score"] = json_data.get("Candidate_Max_Score", 0)
+        kpis["Candidate_Percentage"] = json_data.get("Candidate_Percentage", 0)
+
+        # ------------------ Extra Topics KPIs ------------------
+        extra_totals = json_data.get("Extra_Questions_Totals", {})
+        extra_percentages = json_data.get("Extra_Percentages", {})
+
+        # Extra Topics totals and percentages
+        # Rename to match template keys
+        kpis["Extra_Questions_Totals"] = {
+            "Total_extra_questions": extra_totals.get("Total_extra_questions", 0),
+            "Helpful_extra_questions": extra_totals.get("Helpful_extra_questions", 0),
+            "Neutral_extra_questions": extra_totals.get("Neutral_extra_questions", 0),
+            "Unhelpful_extra_questions": extra_totals.get("Unhelpful_extra_questions", 0),
+            "Candidate_answered_extra_questions": extra_totals.get("Candidate_answered_extra_questions", 0),
+        }
+
+        kpis["Extra_Percentages"] = {
+            "Helpful_extra_percentage": extra_percentages.get("Helpful_extra_percentage", 0),
+            "Neutral_extra_percentage": extra_percentages.get("Neutral_extra_percentage", 0),
+            "Unhelpful_extra_percentage": extra_percentages.get("Unhelpful_extra_percentage", 0),
+            "Overall_recruiter_extra_percentage": extra_percentages.get("Overall_recruiter_extra_percentage", 0),
+            "Candidate_extra_percentage": extra_percentages.get("Candidate_extra_percentage", 0)
+        }
+
+    # ------------------ Render HTML ------------------
+    rendered_html = template.render(
+        data=json_data,
+        kpis=kpis,
+        title=json_data.get("title", "Report Readout"),
+        subtitle=json_data.get("subtitle", "Report")
+    )
+
+    # ------------------ Save HTML ------------------
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(rendered_html)
+        print(f"HTML report successfully generated and saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving HTML file: {e}")
+        return False
+
     
-    print(f"HTML report successfully generated")
-    return rendered_html
-
-
 # def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
 #     """
 #     Process merged report to get HTML page based on template.
