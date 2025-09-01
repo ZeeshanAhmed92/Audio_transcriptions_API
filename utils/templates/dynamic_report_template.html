@@ -68,9 +68,22 @@
       color:var(--text);
       font-weight:600;
     }
-    .score.ok{color:var(--ok);border-color:rgba(40,167,69,.3)}
-    .score.warn{color:var(--warn);border-color:rgba(240,173,78,.3)}
-    .score.bad{color:var(--bad);border-color:rgba(220,53,69,.3)}
+    
+    .chip.ok, .score.ok {
+      color: var(--ok);
+      border-color: rgba(40, 167, 69, .3);
+    }
+
+    .chip.warn, .score.warn {
+      color: var(--warn);
+      border-color: rgba(240, 173, 78, .3);
+    }
+
+    .chip.bad, .score.bad {
+      color: var(--bad);
+      border-color: rgba(220, 53, 69, .3);
+    }
+    
     .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     /* Add this new CSS rule for a 3-column grid */
     .grid-3{display:grid;grid-template-columns:repeat(3, 1fr);gap:var(--gap)}
@@ -141,7 +154,7 @@
         <section class="topics">
           {% for topic in data["Pre_Call_Planning"] %}
             <div class="topic">
-              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+              <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score == 2 %}ok
@@ -153,7 +166,7 @@
               </div>
               <div class="block"><strong>Content:</strong> {{ topic.Topic_Content }}</div>
               <div class="block"><strong>Evidence:</strong> {{ topic.Topic_Evidence }}</div>
-              <div class="block"><strong>Reason:</strong> {{ topic["Reason for Topic_Quality"] }}</div>
+              <div class="block"><strong>Reason:</strong> {{ topic.Reason_for_Topic_Quality }}</div>
               <div class="block summary-block"><strong>Summary:</strong> {{ topic.Summary }}</div>
             </div>
           {% endfor %}
@@ -164,7 +177,7 @@
         <section class="topics">
           {% for topic in data["While_in_the_Shop"] %}
             <div class="topic">
-              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+              <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score == 2 %}ok
@@ -176,7 +189,7 @@
               </div>
               <div class="block"><strong>Content:</strong> {{ topic.Topic_Content }}</div>
               <div class="block"><strong>Evidence:</strong> {{ topic.Topic_Evidence }}</div>
-              <div class="block"><strong>Reason:</strong> {{ topic["Reason for Topic_Quality"] }}</div>
+              <div class="block"><strong>Reason:</strong> {{ topic.Reason_for_Topic_Quality }}</div>
               <div class="block summary-block"><strong>Summary:</strong> {{ topic.Summary }}</div>
             </div>
           {% endfor %}
@@ -187,7 +200,7 @@
         <section class="topics">
           {% for topic in data["Extra_Topics"] %}
             <div class="topic">
-              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+              <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score > 0 %}ok
@@ -199,7 +212,7 @@
               </div>
               <div class="block"><strong>Content:</strong> {{ topic.Topic_Content }}</div>
               <div class="block"><strong>Evidence:</strong> {{ topic.Topic_Evidence }}</div>
-              <div class="block"><strong>Reason:</strong> {{ topic["Reason for Topic_Quality"] }}</div>
+              <div class="block"><strong>Reason:</strong> {{ topic.Reason_for_Topic_Quality }}</div>
               <div class="block summary-block"><strong>Summary:</strong> {{ topic.Summary }}</div>
             </div>
           {% endfor %}
@@ -238,11 +251,11 @@
     <section class="topics">
         {% for topic in data["Candidate_Self_Understanding"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
-                    {% if topic.Topic_Score >= 1.5 %}ok
-                    {% elif topic.Topic_Score > 0 %}warn
+                    {% if topic.Topic_Score == 2 %}ok
+                    {% elif topic.Topic_Score == 1 %}warn
                     {% else %}bad{% endif %}">
                     Topic Score: {{ topic.Topic_Score }}
                 </span>
@@ -262,7 +275,7 @@
     <section class="topics">
         {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score > 0 %}ok
@@ -312,12 +325,12 @@
     <section class="topics">
         {% for topic in data["Manager_Compliance_Assessment"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
-                    {% if topic.Topic_Score >= 1.5 %}ok
-                    {% elif topic.Topic_Score > 0 %}warn
-                    {% else %}bad{% endif %}">
+                    {% if topic.Topic_Score > 0 %}ok
+                    {% elif topic.Topic_Score == 0 %}bad
+                    {% else %}warn{% endif %}">
                     Topic Score: {{ topic.Topic_Score }}
                 </span>
                 <span class="chip">{{ topic.Topic_Quality }}</span>
@@ -336,7 +349,7 @@
     <section class="topics">
         {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score > 0 %}ok
@@ -403,17 +416,17 @@
     <section class="topics">
         {% for topic in data["Interactive Training Session Conducted by Recruiter"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
-                    {% if topic.Recruiter_Score >= 1.5 %}ok
-                    {% elif topic.Recruiter_Score > 0 %}warn
+                    {% if topic.Recruiter_Score == 2 %}ok
+                    {% elif topic.Recruiter_Score == 1 %}warn
                     {% else %}bad{% endif %}">
                     Recruiter Score: {{ topic.Recruiter_Score }}
                 </span>
                 <span class="chip score
-                    {% if topic.Candidate_Score >= 1.5 %}ok
-                    {% elif topic.Candidate_Score > 0 %}warn
+                    {% if topic.Candidate_Score == 2 %}ok
+                    {% elif topic.Candidate_Score== 1 %}warn
                     {% else %}bad{% endif %}">
                     Candidate Score: {{ topic.Candidate_Score }}
                 </span>
@@ -432,7 +445,7 @@
     <section class="topics">
         {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
+            <h3>{{ topic.id | e }}) {{ topic.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Recruiter_Score > 0 %}ok
@@ -512,14 +525,22 @@
         <div class="meta">
           <span class="chip">Question: {{ row.Predefined_Question | e }}</span>
           <span class="chip">Asked: {{ row.Question_asked | e }}</span>
-          {%- set q_score_class = 'ok' if row.Question_score >= 1 else 'warn' if row.Question_score > 0 else 'bad' %}
+          {%- set q_score_class = 'ok' if row.Question_score == 1 else 'warn' if row.Question_score == 0.5 else 'bad' %}
           <span class="chip score {{ q_score_class }}">Q Score: {{ row.Question_score | e }}</span>
-          {%- set r_score_class = 'ok' if row.Response_score >= 1 else 'warn' if row.Response_score > 0 else 'bad' %}
+          {%- set r_score_class = 'ok' if row.Response_score == 1 else 'warn' if row.Response_score == 0.5 else 'bad' %}
           <span class="chip score {{ r_score_class }}">R Score: {{ row.Response_score | e }}</span>
         </div>
         <div class="block">
           <strong>Response</strong>
           <div>{{ row.Response | e }}</div>
+        </div>
+        <div class="block">
+          <strong>Reason for QQ</strong>
+          <div>{{ row.Reason_for_QQ | e }}</div>
+        </div>
+        <div class="block">
+          <strong>Reason for RQ</strong>
+          <div>{{ row.Reason_for_RQ | e }}</div>
         </div>
         <div class="block summary-block">
           <strong>Summary</strong>
@@ -540,9 +561,9 @@
           
           {# Assign color class based on Quality #}
           {%- set quality_class = 
-            'green' if row.Quality == 'Helpful' else 
-            'red' if row.Quality == 'Unhelpful' else 
-            'orange' 
+            'ok' if row.Quality == 'Helpful' else 
+            'warn' if row.Quality == 'Neutral' else 
+            'bad' 
           %}
           <span class="chip {{ quality_class }}">Quality: {{ row.Quality | e }}</span>
 
