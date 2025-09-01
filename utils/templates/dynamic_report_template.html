@@ -548,11 +548,11 @@
 
           {# Score coloring logic #}
           {%- set q_score_class = 
-            'ok' if row.Question_score == 0.5 else 
-            'warn' if row.Question_score == 0 else 
+            'ok' if row.Question_quality_score == 0.5 else 
+            'warn' if row.Question_quality_score == 0 else 
             'bad' 
           %}
-          <span class="chip score {{ q_score_class }}">Q Score: {{ row.Question_score | e }}</span>
+          <span class="chip score {{ q_score_class }}">Q Score: {{ row.Question_quality_score | e }}</span>
         </div>
 
         <div class="block summary-block">
@@ -569,7 +569,7 @@
     <div class="grid-two" style="margin-top:20px">
       {%- if data["interviewer_feedback"] %}
       <div class="card block">
-        <strong>Interviewer Feedback</strong>
+        <strong style="color: black; font-weight: bold;"> Interviewer Feedback</strong>
         <p><strong>Strengths:</strong> {{ data["interviewer_feedback"]["strengths"] | e }}</p>
         <p><strong>Weaknesses:</strong> {{ data["interviewer_feedback"]["weaknesses"] | e }}</p>
         <p><strong>Recommendations:</strong> {{ data["interviewer_feedback"]["recommendations"] | e }}</p>
@@ -578,7 +578,7 @@
       {%- endif %}
       {%- if data["candidate_feedback"] %}
       <div class="card block">
-        <strong>Candidate Feedback</strong>
+        <strong style="color: black; font-weight: bold;"> Candidate Feedback</strong>
         <p><strong>Average Score:</strong> {{ data["candidate_feedback"]["average_score"] | e }}</p>
         <p><strong>Response Summary:</strong> {{ data["candidate_feedback"]["response_quality_summary"] | e }}</p>
         <p><strong>Recommendations:</strong> {{ data["candidate_feedback"]["recommendations"] | e }}</p>
