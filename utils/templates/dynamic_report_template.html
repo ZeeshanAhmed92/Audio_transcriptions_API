@@ -101,19 +101,47 @@
 <body>
   <div class="container">
     <p class="subtitle">{{ subtitle | default("Report") }}</p>
-    <h1 class="title">{{ title | default("Report Readout") }}</h1>
+    <h1 class="title">{{ title | default("Evaluation Report Readout") }}</h1>
 
     {# ---------------- Call Evaluation + Extra Topics ---------------- #}
-    {% if data["Pre_Call_Planning"] or data["While_in_the_Shop"] or data["Extra_Topics"] %}
-      <h2 style="margin-top:40px; margin-bottom: 20px;">Call & Extra Topics Report</h2>
+    {% if kpis.Pre_Call_Planning_Subtotal is defined %}
+      <h2 style="margin-top:40px; margin-bottom: 20px;">Sales Call Evaluation Report</h2>
+      <h3 style="margin-top:40px; margin-bottom: 20px;">KPI's</h3>
+
+    {# ---------------- KPI Cards ---------------- #}
+    <section class="kpis">
+        <div class="card">
+            <div class="kpi-label">Pre-Call Planning Score</div>
+            <div class="kpi-value">{{ kpis.Pre_Call_Planning_Subtotal }}</div>
+            <div class="kpi-sub">
+                Max: {{ kpis.Pre_Call_Planning_Max_Possible_Score }}, 
+                {{ "%.2f"|format(kpis.Pre_Call_Planning_Percentage) }}%
+            </div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">While in the Shop Score</div>
+            <div class="kpi-value">{{ kpis.While_in_the_Shop_Subtotal}}</div>
+            <div class="kpi-sub">
+                Max: {{ kpis.While_in_the_Shop_Max_Possible_Score }}, 
+                {{ "%.2f"|format(kpis.While_in_the_Shop_Percentage) }}%
+            </div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Extra Topics Impact Score</div>
+            <div class="kpi-value">{{ kpis.Extra_Topics_Subtotal }}</div>
+            <div class="kpi-sub">
+                Max: {{ kpis.Extra_Topics_Max_Possible_Score }}, 
+                {{ "%.2f"|format(kpis.Extra_Topics_Percentage) }}%
+            </div>
+        </div>
+    </section>
 
       {# ---------------- Pre-Call Planning ---------------- #}
-      {% if data["Pre_Call_Planning"] %}
-        <h3 style="margin-top:24px; margin-bottom: 12px;">Pre-Call Planning</h3>
+        <h2 style="margin-top:24px; margin-bottom: 12px;">Pre-Call Planning Report</h2>
         <section class="topics">
           {% for topic in data["Pre_Call_Planning"] %}
             <div class="topic">
-              <h3>{{ topic.Topic }}</h3>
+              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score == 2 %}ok
@@ -130,15 +158,13 @@
             </div>
           {% endfor %}
         </section>
-      {% endif %}
 
       {# ---------------- While in the Shop ---------------- #}
-      {% if data["While_in_the_Shop"] %}
-        <h3 style="margin-top:24px; margin-bottom: 12px;">While in the Shop</h3>
+        <h2 style="margin-top:24px; margin-bottom: 12px;">While in the Shop Report</h2>
         <section class="topics">
           {% for topic in data["While_in_the_Shop"] %}
             <div class="topic">
-              <h3>{{ topic.Topic }}</h3>
+              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score == 2 %}ok
@@ -155,15 +181,13 @@
             </div>
           {% endfor %}
         </section>
-      {% endif %}
 
       {# ---------------- Extra Topics ---------------- #}
-      {% if data["Extra_Topics"] %}
         <h3 style="margin-top:24px; margin-bottom: 12px;">Extra Topics</h3>
         <section class="topics">
           {% for topic in data["Extra_Topics"] %}
             <div class="topic">
-              <h3>{{ topic.Topic }}</h3>
+              <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
               <div class="meta">
                 <span class="chip score
                   {% if topic.Topic_Score > 0 %}ok
@@ -180,14 +204,15 @@
             </div>
           {% endfor %}
         </section>
-      {% endif %}
     {% endif %}
 
 
     {# ---------------- Candidate's Self Understanding ---------------- #}
     {% if kpis.Candidate_Subtotal_Score is defined %}
-    <h2 style="margin-top:40px; margin-bottom: 20px;">Candidate's Self Understanding</h2>
-
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Candidate's Evaluation Report</h2>
+    <h3 style="margin-top:40px; margin-bottom: 20px;">KPI's</h3>
+    
+    {# ---------------- KPI Cards ---------------- #}
     <section class="kpis">
         <div class="card">
             <div class="kpi-label">Subtotal Score</div>
@@ -207,10 +232,13 @@
         </div>
     </section>
 
+    {# ---------------- Topic Details for Candidate's Self Understanding ---------------- #}
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Candidate's Evaluation Topics</h2>
+
     <section class="topics">
         {% for topic in data["Candidate_Self_Understanding"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score >= 1.5 %}ok
@@ -227,16 +255,14 @@
         </div>
         {% endfor %}
     </section>
-    {% endif %}
 
     {# ---------------- Extra Topics ---------------- #}
-    {% if Extra_Topics is defined and Extra_Topics|length > 0 %}
     <h2 style="margin-top:40px; margin-bottom: 20px;">Extra Topics</h2>
 
     <section class="topics">
-        {% for topic in Extra_Topics %}
+        {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score > 0 %}ok
@@ -258,8 +284,10 @@
 
     {# ---------------- Manager_Compliance_Assessment ---------------- #}
     {% if kpis.Manager_Subtotal_Score is defined %}
-    <h2 style="margin-top:40px; margin-bottom: 20px;">Manager_Compliance_Assessment</h2>
-
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Manager Compliance Assessment Report</h2>
+    <h3 style="margin-top:40px; margin-bottom: 20px;">KPI's</h3>
+    
+    {# ---------------- KPI Cards ---------------- #}
     <section class="kpis">
         <div class="card">
             <div class="kpi-label">Subtotal Score</div>
@@ -279,10 +307,12 @@
         </div>
     </section>
 
+    {# ---------------- Topic Details for Manager Compliance Assessment ---------------- #}
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Manager's Evaluation Topics</h2>
     <section class="topics">
         {% for topic in data["Manager_Compliance_Assessment"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score >= 1.5 %}ok
@@ -299,16 +329,14 @@
         </div>
         {% endfor %}
     </section>
-    {% endif %}
 
     {# ---------------- Extra Topics ---------------- #}
-    {% if Extra_Topics is defined and Extra_Topics|length > 0 %}
     <h2 style="margin-top:40px; margin-bottom: 20px;">Extra Topics</h2>
 
     <section class="topics">
-        {% for topic in Extra_Topics %}
+        {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Topic_Score > 0 %}ok
@@ -332,6 +360,7 @@
     <h2 style="margin-top:40px; margin-bottom: 20px;">Interactive Training Session</h2>
 
     {# ---------------- KPI Cards ---------------- #}
+    <h3 style="margin-top:40px; margin-bottom: 20px;">KPI's</h3>
     <section class="kpis">
         <div class="card">
             <div class="kpi-label">Recruiter Score Earned</div>
@@ -370,11 +399,11 @@
     </section>
 
     {# ---------------- Training Topics Cards ---------------- #}
-    <h2 style="margin-top:40px; margin-bottom: 20px;">Training Topics</h2>
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Recruiter Training Evaluation Topics</h2>
     <section class="topics">
         {% for topic in data["Interactive Training Session Conducted by Recruiter"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Recruiter_Score >= 1.5 %}ok
@@ -403,7 +432,7 @@
     <section class="topics">
         {% for topic in data["Extra_Topics"] %}
         <div class="topic">
-            <h3>{{ topic.Topic }}</h3>
+            <h3>{{ row.id | e }}) {{ row.Topic | e }}</h3>
             <div class="meta">
                 <span class="chip score
                     {% if topic.Recruiter_Score > 0 %}ok
@@ -422,10 +451,11 @@
 
     {# ---------------- Interview Questions & Responses ---------------- #}
     {%- if data["Interview_Questionair_Responses"] %}
-    <h2 style="margin-top:40px; margin-bottom: 20px;">Interview Questions & Responses</h2>
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Interview Evaluation Report</h2>
 
     {# ---------------- KPIs for Interview Section ---------------- #}
     {% if kpis["Interview_Questions_Predefined"] or kpis["Interview_Questions_Extra"] %}
+    <h3 style="margin-top:40px; margin-bottom: 20px;">KPI's</h3>
     <section class="kpis">
       {% if kpis["Interview_Questions_Predefined"] %}
       {% for key, value in kpis["Interview_Questions_Predefined"].items() %}
@@ -449,7 +479,32 @@
     </section>
     {% endif %}
 
+    {# ---------------- Recruiter Extra Percentages ---------------- #}
+    {% if kpis["Interview_Questions_Extra"]["Recruiter_extra_percentages"] %}
+    <section class="kpis">
+      {% set rec_extra = kpis["Interview_Questions_Extra"]["Recruiter_extra_percentages"] %}
+      <div class="card">
+        <div class="kpi-label">Helpful Extra %</div>
+        <div class="kpi-value">{{ rec_extra.Helpful_extra_percentage }}</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Neutral Extra %</div>
+        <div class="kpi-value">{{ rec_extra.Neutral_extra_percentage }}</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Unhelpful Extra %</div>
+        <div class="kpi-value">{{ rec_extra.Unhelpful_extra_percentage }}</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Overall Recruiter Extra %</div>
+        <div class="kpi-value">{{ rec_extra.Overall_recruiter_extra_percentage }}</div>
+      </div>
+    </section>
+    {% endif %}
+
+
     {# ---------------- Question-Response Cards ---------------- #}
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Interview Evaluation Topics</h2>
     <section class="topics">
       {%- for row in data["Interview_Questionair_Responses"] %}
       <article class="card topic">
@@ -474,7 +529,43 @@
       {%- endfor %}
     </section>
 
+    {# ---------------- Extra Question Cards ---------------- #}
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Extra Questions Asked by Recruiter</h2>
+    <section class="topics">
+      {%- for row in data["extra_questions"] %}
+      <article class="card topic">
+        <h3>{{ row.id | e }}) {{ row.Competency | e }}</h3>
+        <div class="meta">
+          <span class="chip">Question: {{ row.Question | e }}</span>
+          
+          {# Assign color class based on Quality #}
+          {%- set quality_class = 
+            'green' if row.Quality == 'Helpful' else 
+            'red' if row.Quality == 'Unhelpful' else 
+            'orange' 
+          %}
+          <span class="chip {{ quality_class }}">Quality: {{ row.Quality | e }}</span>
+
+          {# Score coloring logic #}
+          {%- set q_score_class = 
+            'ok' if row.Question_score == 0.5 else 
+            'warn' if row.Question_score == 0 else 
+            'bad' 
+          %}
+          <span class="chip score {{ q_score_class }}">Q Score: {{ row.Question_score | e }}</span>
+        </div>
+
+        <div class="block summary-block">
+          <strong>Summary</strong>
+          <div>{{ row.Summary | e }}</div>
+        </div>
+      </article>
+      {%- endfor %}
+    </section>
+
+
     {# ---------------- Interviewer & Candidate Feedback ---------------- #}
+    <h2 style="margin-top:40px; margin-bottom: 20px;">Interviewer & Candidate Feedback Report</h2>
     <div class="grid-two" style="margin-top:20px">
       {%- if data["interviewer_feedback"] %}
       <div class="card block">

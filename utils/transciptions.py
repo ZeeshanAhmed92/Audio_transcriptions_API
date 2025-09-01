@@ -146,7 +146,7 @@ def generate_html(json_data, output_path):
         kpis["Extra_Topics_Max_Possible_Score"] = json_data.get("Extra_Topics_Max_Possible_Score", 0)
         kpis["Extra_Topics_Percentage"] = json_data.get("Extra_Topics_Percentage", 0)
 
-    # ------------------ Candidate Self-Understanding KPIs ------------------
+    # ------------------ Manager_Compliance_Assessment KPIs ------------------
     if "Manager_Compliance_Assessment" in json_data:
         # Top-level KPIs
         kpis["Manager_Subtotal_Score"] = json_data.get("Manager_Subtotal_Score", 0)
@@ -157,34 +157,25 @@ def generate_html(json_data, output_path):
         kpis["Extra_Topics_Percentage"] = json_data.get("Extra_Topics_Percentage", 0)
 
     # ------------------ Call Evaluation KPIs ------------------
-    # The template expects specific key names (`earned`, `max`, `percentage`),
-    # so we map the JSON data to these keys.
-    if "Pre_Call_Planning_Subtotal" in json_data:
-        kpis["Pre_Call_Planning"] = {
-            "earned": json_data.get("Pre_Call_Planning_Subtotal", 0),
-            "max": json_data.get("Pre_Call_Planning_Max_Possible_Score", 0),
-            "percentage": json_data.get("Pre_Call_Planning_Percentage", 0)
-        }
-    if "While_in_the_Shop_Subtotal" in json_data:
-        kpis["While_in_the_Shop"] = {
-            "earned": json_data.get("While_in_the_Shop_Subtotal", 0),
-            "max": json_data.get("While_in_the_Shop_Max_Possible_Score", 0),
-            "percentage": json_data.get("While_in_the_Shop_Percentage", 0)
-        }
-    if "Extra_Topics_Subtotal" in json_data:
-        kpis["Extra_Topics"] = {
-            "earned": json_data.get("Extra_Topics_Subtotal", 0),
-            "max": json_data.get("Extra_Topics_Max_Possible_Score", 0),
-            "percentage": json_data.get("Extra_Topics_Percentage", 0)
-        }
+    if "Pre_Call_Planning" and "While_in_the_Shop" in json_data:
+        # Top-level KPIs
+        kpis["Pre_Call_Planning_Subtotal"] = json_data.get("Pre_Call_Planning_Subtotal", 0)
+        kpis["Pre_Call_Planning_Max_Possible_Score"] = json_data.get("Pre_Call_Planning_Max_Possible_Score", 0)
+        kpis["Pre_Call_Planning_Percentage"] = json_data.get("Pre_Call_Planning_Percentage", 0)
+        kpis["While_in_the_Shop_Subtotal"] = json_data.get("While_in_the_Shop_Subtotal", 0)
+        kpis["While_in_the_Shop_Max_Possible_Score"] = json_data.get("While_in_the_Shop_Max_Possible_Score", 0)
+        kpis["While_in_the_Shop_Percentage"] = json_data.get("While_in_the_Shop_Percentage", 0)
+        kpis["Extra_Topics_Subtotal"] = json_data.get("Extra_Topics_Subtotal", 0)
+        kpis["Extra_Topics_Max_Possible_Score"] = json_data.get("Extra_Topics_Max_Possible_Score", 0)
+        kpis["Extra_Topics_Percentage"] = json_data.get("Extra_Topics_Percentage", 0)
 
     # ------------------ Interview Question KPIs ------------------
     if "Interview_Questionair_Responses" in json_data:
         coverage = json_data.get("interview_coverage", {})
         predefined = coverage.get("predefined_questions", {})
-        extra = coverage.get("extra_questions", {})
+        extra = coverage.get("extra_questions_metrics", {})
 
-        # Create flat dictionaries to match the HTML loop structure
+        # Predefined questions KPIs
         kpis["Interview_Questions_Predefined"] = {
             "Total_predefined_questions": predefined.get("Total_predefined_questions", 0),
             "Questions_asked_by_recruiter_from_pre_defined": predefined.get("Questions_asked_by_recruiter_from_pre_defined", 0),
@@ -192,15 +183,24 @@ def generate_html(json_data, output_path):
             "Answer_given_by_candidate_against_recruiter_asked_questions": predefined.get("Answer_given_by_candidate_against_recruiter_asked_questions", 0),
             "Candidate_Percentage": predefined.get("Candidate_Percentage", 0)
         }
+
+        # Extra questions KPIs
+        recruiter_extra_percentages = extra.get("Recruiter_extra_percentages", {})
         kpis["Interview_Questions_Extra"] = {
             "Total_extra_questions": extra.get("Total_extra_questions", 0),
             "Helpful_extra_questions": extra.get("Helpful_extra_questions", 0),
             "Neutral_extra_questions": extra.get("Neutral_extra_questions", 0),
             "Unhelpful_extra_questions": extra.get("Unhelpful_extra_questions", 0),
             "Candidate_answered_extra_questions": extra.get("Candidate_answered_extra_questions", 0),
-            # The template handles recruiter percentages separately, so we include them here.
-            "Recruiter_extra_percentages": extra.get("Recruiter_extra_percentages", {})
+            "Recruiter_extra_percentages": {
+                "Helpful_extra_percentage": recruiter_extra_percentages.get("Helpful_extra_percentage", 0),
+                "Neutral_extra_percentage": recruiter_extra_percentages.get("Neutral_extra_percentage", 0),
+                "Unhelpful_extra_percentage": recruiter_extra_percentages.get("Unhelpful_extra_percentage", 0),
+                "Overall_recruiter_extra_percentage": recruiter_extra_percentages.get("Overall_recruiter_extra_percentage", 0)
+            },
+            "Candidate_extra_percentage": extra.get("Candidate_extra_percentage", 0)
         }
+
 
     # ------------------ Interactive Training Session KPIs ------------------
     if "Interactive Training Session Conducted by Recruiter" in json_data:
@@ -238,7 +238,7 @@ def generate_html(json_data, output_path):
     rendered_html = template.render(
         data=json_data,
         kpis=kpis,
-        title=json_data.get("title", "Report Readout"),
+        title=json_data.get("title", "Evaluation Report Readout"),
         subtitle=json_data.get("subtitle", "Report")
     )
 
@@ -251,77 +251,6 @@ def generate_html(json_data, output_path):
     except Exception as e:
         print(f"Error saving HTML file: {e}")
         return False
-
-    
-# def generate_html(project_id, location, file_path, max_retries=3, backoff=5):
-#     """
-#     Process merged report to get HTML page based on template.
-#     Uses ChatVertexAI (LangChain wrapper) with retries + explicit error handling.
-#     """
-#     print("Initializing Vertex AI...")
-#     vertexai.init(project=project_id, location=location)
-
-#     # Read the report
-#     report = pd.read_excel(file_path, sheet_name="Merged Report")
-#     report_json = report.to_json(orient="records", indent=2)
-
-#     # Load the template
-#     with open("./utils/templates/template.txt", "r", encoding="utf-8") as f:
-#         template = f.read()
-
-#     # Prompt
-#     prompt_for_html = f"""
-#     You are an expert HTML designer.
-#     Your task is to:
-#     1. Take the given report and make a HTML page based on the provided template.
-#     2. The template is for design and structure only. Content should only be from report.
-#     3. Make sure all the content of report is represented.
-#     4. If there are multiple sections in the report then create multiple sections with the same names in the HTML too.
-#     5. Don't make dropdowns. Make it PDF and print friendly.
-
-#     Report (Content):
-#     \"\"\"{report_json}\"\"\" 
-#     Template (Design):
-#     \"\"\"{template}\"\"\" 
-
-#     Output ONLY valid HTML code, nothing else.
-#     Format:
-#        <html>...<html>
-#     """
-
-#     print("Sending request to Gemini (ChatVertexAI)...")
-
-#     # Create ChatVertexAI model
-#     llm = ChatVertexAI(model="gemini-2.5-pro", temperature=0)
-
-#     for attempt in range(1, max_retries + 1):
-#         try:
-#             response = llm.invoke(prompt_for_html)
-
-#             if not response or not getattr(response, "content", None):
-#                 print("⚠️ Gemini returned empty output")
-#                 return (f"This is the response {response}")
-
-#             return response.content.strip()
-
-#         except grpc.RpcError as e:
-#             print(f"❌ [gRPC Error] Attempt {attempt}/{max_retries}")
-#             print("   Code:", e.code())
-#             print("   Details:", e.details())
-
-#         except (GoogleAPICallError, RetryError) as e:
-#             print(f"❌ [Vertex AI Error] Attempt {attempt}/{max_retries}: {e}")
-
-#         except Exception as e:
-#             print(f"❌ [Unexpected Error] Attempt {attempt}/{max_retries}: {e}")
-
-#         if attempt < max_retries:
-#             wait = backoff * attempt
-#             print(f"⏳ Retrying in {wait} seconds...")
-#             time.sleep(wait)
-
-#     print("❌ All retries failed. Could not generate HTML.")
-#     return None
 
 
 def process_audio_with_gemini(project_id, location, gcs_uri):
@@ -665,7 +594,7 @@ def export_report_to_excel(report_data, output_file="interview_report.xlsx"):
         blocks.append(("Candidate Feedback", candidate_df))
 
         predefined = data.get("interview_coverage", {}).get("predefined_questions", {})
-        extra = data.get("interview_coverage", {}).get("extra_questions", {})
+        extra = data.get("interview_coverage", {}).get("extra_questions_metrics", {})
 
         df_pre_totals = pd.DataFrame([{
             "Total_predefined_question": predefined.get("Total_predefined_question"),
