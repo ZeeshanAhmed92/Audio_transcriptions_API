@@ -206,7 +206,7 @@ def report_worker():
                 report_queue.task_done()
                 continue
 
-            jobs_status[job_id]["status"] = "processing"
+            jobs_status[job_id]["status"] = "Processing"
             write_job_statuses(jobs_status)
             print(f"[Worker] Start job_id={job_id}, file={filename}, job_number={job_number}")
 
@@ -350,6 +350,8 @@ def report_worker():
                 write_job_statuses(jobs_status)
         finally:
             report_queue.task_done()
+
+threading.Thread(target=report_worker, daemon=True).start()
 
 @app.route("/generate_report", methods=["POST"])
 @jwt_required()
@@ -827,7 +829,7 @@ def list_jobs():
         ) + sum(
             1 for jid, status in jobs_status.items()
             if str(status.get("job_folder", "")).endswith(f"job_{job_id}")
-            and status.get("status") in ["pending", "processing", "Uploading to GCS", "Transcribing Audio", "Generating Report"]
+            and status.get("status") in ["Pending", "Processing", "Uploading to GCS", "Transcribing Audio", "Generating Report"]
         )
 
         jobs_with_counts.append({
@@ -842,7 +844,6 @@ def list_jobs():
 
 
 if __name__ == '__main__':
-    threading.Thread(target=report_worker, daemon=True).start()
     os.makedirs(GCS_FOLDER_NAME, exist_ok=True)
     os.makedirs(TEMP_DIR, exist_ok=True)
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

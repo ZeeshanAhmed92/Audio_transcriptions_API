@@ -3,6 +3,7 @@ faster-whisper
 openai
 pydub
 google-cloud-storage
+google-cloud-firestore
 python-dotenv
 langchain_google_vertexai
 google-cloud-aiplatform
@@ -13,3 +14,4 @@ streamlit
 flask-jwt-extended
 gunicorn
 audioop-lts; python_version>="3.13"
+google-cloud-pubsub

@@ -697,3 +697,28 @@ def export_report_to_excel(report_data, output_file="interview_report.xlsx"):
             row_cursor += 1  # space between sections
 
     print(f"✅ Report exported with Summary to {output_file} successfully.")
+
+
+def download_blob(bucket_name, source_blob_name):
+    """Downloads a blob from the bucket to a bytes object."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(source_blob_name)
+
+    # Download to a bytes object and return
+    return blob.download_as_bytes()
+
+def upload_blob(bucket_name, source_file_name, destination_blob_name):
+    """Uploads a file to the bucket."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(destination_blob_name)
+
+    # Check if the source is a file path or a string/bytes
+    if isinstance(source_file_name, str):
+        blob.upload_from_filename(source_file_name)
+    else:
+        # Assumes source is a bytes-like object or file-like object
+        blob.upload_from_string(source_file_name)
+
+    print(f"File {source_file_name} uploaded to {destination_blob_name}.")
