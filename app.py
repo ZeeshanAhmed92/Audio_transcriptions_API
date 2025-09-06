@@ -134,7 +134,6 @@ def get_questions():
     ]
     return jsonify(files)
 
-
 @app.route("/delete_job/<int:job_id>", methods=["DELETE"])
 @jwt_required()
 def delete_job(job_id):
@@ -146,13 +145,13 @@ def delete_job(job_id):
     job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
 
-    # Step 1: Find all related jobs and add them to the cancellation set.
+    # Step 1: Find all related jobs in the queue and flag them for cancellation.
     jobs_to_remove = []
     with cancellation_lock:
         for jid, status in list(jobs_status.items()):
             # Check if the job's folder path matches the job_id
             if str(status.get("job_folder", "")).endswith(f"job_{job_id}"):
-                jobs_to_cancel.add(jid) # Signal the worker to stop this specific job
+                jobs_to_cancel.add(jid)  # Signal the worker to stop this specific job
                 jobs_to_remove.append(jid)
     
     # Step 2: Remove the job entries from the in-memory status dictionary.
@@ -170,14 +169,20 @@ def delete_job(job_id):
             removed_any = True
     except OSError as e:
         print(f"Error deleting job folders: {e}")
-        return jsonify({"msg": f"An error occurred while deleting folders for job {job_id}."}), 500
+        # The job should still be removed from the list even if files can't be deleted.
+        pass
 
-    # Step 4: Save the updated jobs_status dictionary to the file.
-    write_job_statuses(jobs_status)
+    # Step 4: Remove the job from the main jobs.json file.
+    jobs = read_jobs()
+    original_job_count = len(jobs)
+    jobs = [job for job in jobs if job["id"] != job_id]
+    
+    if len(jobs) < original_job_count:
+        write_jobs(jobs)
+        write_job_statuses(jobs_status) # Save the updated in-memory job statuses
+        return jsonify({"msg": f"Job {job_id} and all related data have been successfully deleted."}), 200
 
-    if removed_any:
-        return jsonify({"msg": f"Job {job_id} and related data deleted. In-progress jobs will be cancelled."}), 200
-
+    # If the job was not found in jobs.json, return a not found message.
     return jsonify({"msg": "Job not found"}), 404
 
 
@@ -736,6 +741,7 @@ def download_html_report(job_id, filename):
     return send_from_directory(job_folder, filename, as_attachment=True)
 
 
+# In your Flask application code
 @app.route("/delete_files", methods=["DELETE"])
 @jwt_required()
 def delete_files():
@@ -772,7 +778,7 @@ def delete_files():
         for jid, status in list(jobs_status.items()):
             if str(status.get("job_folder", "")).endswith(f"job_{job_id_folder}") and status.get("file") == filename:
                 with cancellation_lock:
-                    jobs_to_cancel.add(jid) # Add the job to the cancellation set
+                    jobs_to_cancel.add(jid)
                 jobs_to_remove.append(jid)
 
     for jid in jobs_to_remove:
@@ -780,11 +786,21 @@ def delete_files():
 
     write_job_statuses(jobs_status)
 
+    # Check if the job folder is empty and delete the job if it is
+    if not os.listdir(job_upload_folder):
+        delete_job_folders(job_id_folder)
+        
+        # Remove the job from jobs.json as well
+        jobs = read_jobs()
+        jobs = [job for job in jobs if job["id"] != job_id_folder]
+        write_jobs(jobs)
+
     return jsonify({
         "deleted": deleted,
         "not_found": not_found,
         "msg": f"Files {deleted} deleted successfully. In-progress jobs will be cancelled."
     }), 200
+
 
 @app.route("/jobs")
 @jwt_required()
