@@ -1,16 +1,24 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, make_response, send_file, render_template_string
-import threading, queue, os, uuid, json
-import pandas as pd
-import time
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from dotenv import load_dotenv
-from utils.transciptions import (process_audio_with_gemini, generate_report, clean_and_parse_json, split_and_upload,
-                                 export_report_to_excel, generate_html)
-import shutil
-from openpyxl import load_workbook, Workbook
-from openpyxl.styles import Font, PatternFill, Border, Alignment, Protection
+import os
+import re
+import io
+import gc
+import sys
+import json
 import copy
+import time
+import uuid
+import shutil
+import queue
+import threading
+import pandas as pd
 import traceback
+from dotenv import load_dotenv
+from flask import Flask, request, jsonify, send_file, render_template, send_from_directory, make_response, render_template_string
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, Border, Alignment, PatternFill, Protection
+from utils.transciptions import (generate_html, generate_report, split_and_upload, clean_and_parse_json, process_audio_with_gemini,
+    export_report_to_excel)
 
 load_dotenv()
 
@@ -57,8 +65,11 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['REPORT_FOLDER'] = REPORT_FOLDER
 
-jwt = JWTManager(app)
+# Add shared state for cancellation at the top of your file
+jobs_to_cancel = set()
+cancellation_lock = threading.Lock()
 
+jwt = JWTManager(app)
 
 # --- Persistent state for jobs_status ---
 def read_job_statuses():
@@ -127,45 +138,45 @@ def get_questions():
 @app.route("/delete_job/<int:job_id>", methods=["DELETE"])
 @jwt_required()
 def delete_job(job_id):
+    """
+    Deletes all files and folders associated with a specific job_id,
+    and also signals the background worker to cancel any in-progress
+    tasks related to that job.
+    """
     job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id}")
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
 
-    removed_any = False
-
-    # 🔹 Delete upload folder
-    if os.path.exists(job_upload_folder):
-        shutil.rmtree(job_upload_folder)
-        removed_any = True
-
-    # 🔹 Delete report folder
-    if os.path.exists(job_report_folder):
-        shutil.rmtree(job_report_folder)
-        removed_any = True
-
-    # 🔹 Remove all job statuses for this job_id
+    # Step 1: Find all related jobs and add them to the cancellation set.
     jobs_to_remove = []
-    for jid, status in list(jobs_status.items()):
-        if str(status.get("job_folder", "")).endswith(f"job_{job_id}"):
-            jobs_to_remove.append(jid)
-
+    with cancellation_lock:
+        for jid, status in list(jobs_status.items()):
+            # Check if the job's folder path matches the job_id
+            if str(status.get("job_folder", "")).endswith(f"job_{job_id}"):
+                jobs_to_cancel.add(jid) # Signal the worker to stop this specific job
+                jobs_to_remove.append(jid)
+    
+    # Step 2: Remove the job entries from the in-memory status dictionary.
     for jid in jobs_to_remove:
         jobs_status.pop(jid, None)
 
-    if jobs_to_remove:
-        write_job_statuses(jobs_status)  # persist changes
-
-    # 🔹 Remove from jobs.json
-    if os.path.exists(JOBS_FILE):
-        with open(JOBS_FILE, "r") as f:
-            jobs = json.load(f)
-        updated_jobs = [j for j in jobs if j["id"] != job_id]
-        if len(updated_jobs) != len(jobs):
-            with open(JOBS_FILE, "w") as f:
-                json.dump(updated_jobs, f, indent=4)
+    # Step 3: Delete the physical folders from the file system.
+    removed_any = False
+    try:
+        if os.path.exists(job_upload_folder):
+            shutil.rmtree(job_upload_folder)
             removed_any = True
+        if os.path.exists(job_report_folder):
+            shutil.rmtree(job_report_folder)
+            removed_any = True
+    except OSError as e:
+        print(f"Error deleting job folders: {e}")
+        return jsonify({"msg": f"An error occurred while deleting folders for job {job_id}."}), 500
+
+    # Step 4: Save the updated jobs_status dictionary to the file.
+    write_job_statuses(jobs_status)
 
     if removed_any:
-        return jsonify({"msg": f"Job {job_id} and related data deleted"}), 200
+        return jsonify({"msg": f"Job {job_id} and related data deleted. In-progress jobs will be cancelled."}), 200
 
     return jsonify({"msg": "Job not found"}), 404
 
@@ -174,6 +185,17 @@ def report_worker():
     while True:
         job_id, filename, job_number, questionaire = report_queue.get()
         try:
+            # Check for cancellation at the start
+            with cancellation_lock:
+                if job_id in jobs_to_cancel:
+                    print(f"[Worker] Job {job_id} was cancelled. Skipping.")
+                    jobs_to_cancel.remove(job_id)
+                    jobs_status[job_id]["status"] = "cancelled"
+                    jobs_status[job_id]["error"] = "Job was deleted by user."
+                    write_job_statuses(jobs_status)
+                    report_queue.task_done()
+                    continue
+
             if job_id not in jobs_status:
                 print(f"[Worker] Warning: job_id {job_id} not found in jobs_status")
                 report_queue.task_done()
@@ -183,7 +205,7 @@ def report_worker():
             write_job_statuses(jobs_status)
             print(f"[Worker] Start job_id={job_id}, file={filename}, job_number={job_number}")
 
-            # --- Folders ---
+            # --- Folders and Paths ---
             audio_path = os.path.join(UPLOAD_FOLDER, f"job_{job_number}", filename)
             if not os.path.exists(audio_path):
                 raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -191,7 +213,6 @@ def report_worker():
             report_job_folder = os.path.join(REPORT_FOLDER, f"job_{job_number}")
             os.makedirs(report_job_folder, exist_ok=True)
 
-            # --- Filenames (no UUID, scoped by job folder) ---
             base_name = os.path.splitext(filename)[0]
             meta_path = os.path.join(report_job_folder, f"{base_name}_meta.json")
             transcription_path = os.path.join(report_job_folder, f"{base_name}_transcription.json")
@@ -199,17 +220,15 @@ def report_worker():
             report_excel_path = os.path.join(report_job_folder, f"{base_name}_evaluation_report.xlsx")
             report_html_path = os.path.join(report_job_folder, f"{base_name}_evaluation_report.html")
 
-            # --- Metadata ---
+            meta = {
+                "gcs_uri": None,
+                "transcription_done": False,
+                "report_done": False,
+                "questionaire": questionaire
+            }
             if os.path.exists(meta_path):
                 with open(meta_path, "r") as f:
                     meta = json.load(f)
-            else:
-                meta = {
-                    "gcs_uri": None,
-                    "transcription_done": False,
-                    "report_done": False,
-                    "questionaire": questionaire
-                }
 
             # Reset meta if questionnaire changes
             if meta.get("questionaire") != questionaire:
@@ -231,6 +250,17 @@ def report_worker():
                     json.dump(meta, f, indent=4)
             else:
                 print("[Worker] GCS upload already done.")
+
+            # Check for cancellation before transcription
+            with cancellation_lock:
+                if job_id in jobs_to_cancel:
+                    print(f"[Worker] Job {job_id} cancelled during GCS upload. Skipping.")
+                    jobs_to_cancel.remove(job_id)
+                    jobs_status[job_id]["status"] = "cancelled"
+                    jobs_status[job_id]["error"] = "Job was deleted by user."
+                    write_job_statuses(jobs_status)
+                    report_queue.task_done()
+                    continue
 
             # --- Step 2: Transcription ---
             if not meta.get("transcription_done") or not os.path.exists(transcription_path):
@@ -258,6 +288,17 @@ def report_worker():
                     continue
             else:
                 print("[Worker] Transcription already done.")
+
+            # Check for cancellation before report generation
+            with cancellation_lock:
+                if job_id in jobs_to_cancel:
+                    print(f"[Worker] Job {job_id} cancelled during transcription. Skipping.")
+                    jobs_to_cancel.remove(job_id)
+                    jobs_status[job_id]["status"] = "cancelled"
+                    jobs_status[job_id]["error"] = "Job was deleted by user."
+                    write_job_statuses(jobs_status)
+                    report_queue.task_done()
+                    continue
 
             # --- Step 3: Report Generation ---
             if not meta.get("report_done") or not os.path.exists(report_excel_path):
@@ -304,8 +345,6 @@ def report_worker():
                 write_job_statuses(jobs_status)
         finally:
             report_queue.task_done()
-
-
 
 @app.route("/generate_report", methods=["POST"])
 @jwt_required()
@@ -708,7 +747,7 @@ def delete_files():
 
     job_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"job_{job_id_folder}")
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id_folder}")
-    
+
     deleted, not_found = [], []
     jobs_to_remove = []
 
@@ -723,14 +762,17 @@ def delete_files():
         else:
             not_found.append(filename)
 
-        # 2. Delete all related report files (job_id varies → use wildcard match)
-        for f in os.listdir(job_report_folder):
-            if base_name in f:  # matches any {job_id}_{base_name}_*.*
-                os.remove(os.path.join(job_report_folder, f))
+        # 2. Delete all related report files
+        if os.path.exists(job_report_folder):
+            for f in os.listdir(job_report_folder):
+                if base_name in f:
+                    os.remove(os.path.join(job_report_folder, f))
 
-        # 3. Remove from jobs_status
+        # 3. Find job IDs and add them to the cancellation set
         for jid, status in list(jobs_status.items()):
             if str(status.get("job_folder", "")).endswith(f"job_{job_id_folder}") and status.get("file") == filename:
+                with cancellation_lock:
+                    jobs_to_cancel.add(jid) # Add the job to the cancellation set
                 jobs_to_remove.append(jid)
 
     for jid in jobs_to_remove:
@@ -741,10 +783,8 @@ def delete_files():
     return jsonify({
         "deleted": deleted,
         "not_found": not_found,
-        "msg": f"Files {deleted} deleted successfully."
+        "msg": f"Files {deleted} deleted successfully. In-progress jobs will be cancelled."
     }), 200
-
-
 
 @app.route("/jobs")
 @jwt_required()
