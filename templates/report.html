@@ -346,8 +346,8 @@ function hideConfirmModal() {
 
 document.addEventListener("DOMContentLoaded", () => {
     const jobId = "{{ job_id }}";
-    const POLL_INTERVAL = 5000;
-    let fileJobs = {};
+    const POLL_INTERVAL = 3000;
+    let fileJobs = {}; // Store unique job IDs for each file
     let questionnaires = [];
     let fileStatuses = {};
     const logoutBtn = document.getElementById("logoutBtn");
@@ -618,12 +618,16 @@ document.addEventListener("DOMContentLoaded", () => {
             list.appendChild(li);
         });
 
-        await updateFileStatuses();
-        pollJobStatuses();
+        // Initial check for all statuses
+        await updateAllFileStatuses();
+        updateButtonStates();
     }
 
     async function initiateJob(file, questionnaire) {
         const statusEl = document.getElementById(`status-${file}`);
+        const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+
+        generateBtn.disabled = true;
         statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
 
         const res = await fetch(window.location.origin + "/generate_report", {
@@ -633,12 +637,61 @@ document.addEventListener("DOMContentLoaded", () => {
             credentials: "same-origin"
         });
         const data = await res.json();
-        if (data.job_id) fileJobs[file] = data.job_id;
-        else showMessage(data.error || "Failed to initiate job", true);
+        if (data.job_id) {
+            fileJobs[file] = data.job_id;
+            fileStatuses[file] = "queued";
+            pollJobStatus(file);
+        } else {
+            showMessage(data.error || "Failed to initiate job", true);
+            generateBtn.disabled = false;
+            statusEl.innerHTML = "Error";
+            fileStatuses[file] = "Error";
+        }
         updateButtonStates();
     }
 
-    async function updateFileStatuses() {
+    async function pollJobStatus(file) {
+        const uniqueJobId = fileJobs[file];
+        if (!uniqueJobId) return;
+
+        try {
+            const res = await fetch(window.location.origin + `/report_status/${uniqueJobId}`, { credentials: "same-origin" });
+            const jobData = await res.json();
+            
+            const statusEl = document.getElementById(`status-${file}`);
+            const downloadLinksEl = document.getElementById(`download-links-${file}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+
+            fileStatuses[file] = jobData.status;
+
+            if (jobData.status === "done") {
+                statusEl.innerHTML = "Done";
+                generateBtn.disabled = false;
+                downloadLinksEl.innerHTML = `
+                    <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
+                    <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
+                `;
+                delete fileJobs[file];
+            } else if (jobData.status === "error") {
+                statusEl.innerHTML = "Error: " + (jobData.error || "Failed");
+                generateBtn.disabled = false;
+            } else {
+                statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
+                setTimeout(() => pollJobStatus(file), POLL_INTERVAL);
+            }
+            updateButtonStates();
+        } catch (error) {
+            console.error("Error polling job status:", error);
+            const statusEl = document.getElementById(`status-${file}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+            statusEl.innerHTML = "Error";
+            generateBtn.disabled = false;
+            fileStatuses[file] = "Error";
+            updateButtonStates();
+        }
+    }
+
+    async function updateAllFileStatuses() {
         const res = await fetch(window.location.origin + "/all_jobs_status", { credentials: "same-origin" });
         const allJobs = await res.json();
 
@@ -648,11 +701,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const downloadLinksEl = document.getElementById(`download-links-${filename}`);
             const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
 
-            const matchingJob = Object.entries(allJobs).find(([jid, job]) => job.file === filename);
-            if (matchingJob) {
-                const [job_id, jobData] = matchingJob;
-                fileJobs[filename] = job_id;
+            const matchingJob = Object.entries(allJobs).find(
+                ([uuid, job]) => job.file === filename && job.job_number == jobId
+            );
 
+            if (matchingJob) {
+                const [uuid, jobData] = matchingJob;
+                fileJobs[filename] = uuid; // Link the UUID
+                
                 if (jobData.status === "done" && jobData.report_excel && jobData.report_html) {
                     statusEl.innerHTML = "Done";
                     fileStatuses[filename] = "Done";
@@ -661,18 +717,20 @@ document.addEventListener("DOMContentLoaded", () => {
                         <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
                         <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
                     `;
-                    delete fileJobs[filename];
                 } else if (jobData.status === "error") {
                     statusEl.innerHTML = "Error: " + (jobData.error || "Failed");
                     fileStatuses[filename] = "Error";
                     generateBtn.disabled = false;
                     downloadLinksEl.innerHTML = "";
-                    delete fileJobs[filename];
                 } else {
                     statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
                     fileStatuses[filename] = jobData.status;
                     generateBtn.disabled = true;
                     downloadLinksEl.innerHTML = "";
+                    // Start polling for this specific job if it's not done/error
+                    if (jobData.status !== "done" && jobData.status !== "error") {
+                        setTimeout(() => pollJobStatus(filename), POLL_INTERVAL);
+                    }
                 }
             } else {
                 statusEl.innerHTML = "Idle";
@@ -681,14 +739,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 downloadLinksEl.innerHTML = "";
             }
         });
-
         updateButtonStates();
     }
 
-    async function pollJobStatuses() {
-        await updateFileStatuses();
-        setTimeout(pollJobStatuses, POLL_INTERVAL);
-    }
 
     /* ========== Init ========== */
     (async function init() {

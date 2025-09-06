@@ -40,5 +40,10 @@
         "job_folder": "reports/job_1",
         "report_excel": "Osman Goni 1.m4a_evaluation_report.xlsx",
         "report_html": "Osman Goni 1.m4a_evaluation_report.html"
+    },
+    "9ea2243e-8a8e-489c-8bf6-c75e76c26172": {
+        "status": "pending",
+        "file": "Osman Goni 1.m4a",
+        "job_folder": "reports/job_1"
     }
 }
