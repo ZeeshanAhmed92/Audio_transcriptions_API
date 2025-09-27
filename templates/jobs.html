@@ -7,9 +7,9 @@
         body {
             margin: 0;
             padding: 0;
-            color: rgb(0, 0, 0);
+            color: #f4f4f4;
             font-family: Arial, sans-serif;
-            background: url("/static/images/Transcriptions.jpeg") no-repeat center center fixed;
+            background: url("/static/images/transcription.png") no-repeat center center fixed;
             background-size: cover;
         }
 
@@ -24,6 +24,10 @@
             top: 0;
         }
 
+        h1 {
+            color: #000000;
+        }
+
         button.logout-btn {
             background-color: #ff4d4d;
             color: white;
@@ -35,28 +39,40 @@
         button.logout-btn:hover {
             background-color: #e60000;
         }
+        
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
         }
+        
         th, td {
             padding: 0.75rem;
-            border-bottom: 1px solid #000000;
-            text-align: left;
+            border-bottom: 1px solid #ddd;
+            color: #8bbeed; /* Changed for better visibility */
+            text-align: center;
         }
-       a.job-link {
-            color: black;              /* job name color */
+
+        .actions-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        a.job-link {
+            color: #8bbeed; /* Changed for better visibility */
             text-decoration: none;
         }
 
         a.job-link:hover {
             text-decoration: underline;
-            color: #222;               /* optional darker hover */
+            color: #8bbeed; 
         }
 
         a.job-link .counts {
-            color: black;              /* job.total_audios + job.active_runs */
+            color: #8bbeed;
             font-size: 0.85rem;
             margin-left: 0.5rem;
         }
@@ -72,13 +88,14 @@
         button.delete-btn:hover {
             background-color: #cc0000;
         }
+        
         .floating-btn {
             position: fixed;
             bottom: 2rem;
             right: 2rem;
             width: 60px;
             height: 60px;
-            background-color: #0066ff;
+            background-color: #8bbeed;
             color: white;
             font-size: 2rem;
             font-weight: bold;
@@ -89,8 +106,9 @@
             transition: background 0.2s ease;
         }
         .floating-btn:hover {
-            background-color: #0052cc;
+            background-color: #8bbeed;
         }
+        
         .modal {
             display: none;
             position: fixed;
@@ -131,7 +149,7 @@
             color: white;
         }
         .modal-content button {
-            background-color: #0066ff;
+            background-color: #8bbeed;
             color: white;
             padding: 0.75rem;
             border: none;
@@ -141,7 +159,7 @@
             width: 100%;
         }
         .modal-content button:hover {
-            background-color: #0052cc;
+            background-color: #8bbeed;
         }
     </style>
 </head>
@@ -162,17 +180,19 @@
         </thead>
         <tbody id="jobsList">
         {% for job in jobs %}
-        <tr data-id="{{ job.id }}" color="black">
-            <td color="black">
-                <a href="/report/{{ job.id }}" class="job-link" color="black">
+        <tr data-id="{{ job.id }}">
+            <td>
+                <a href="/report/{{ job.id }}" class="job-link">
                     {{ job.name }}
                     <span class="counts">
                         ({{ job.total_audios }} audios, {{ job.active_runs }} running)
                     </span>
                 </a>
             </td>
-            <td style="text-align: right;">
-                <button class="delete-btn" onclick="deleteJob('{{ job.id }}')">Delete</button>
+            <td>
+                <div class="actions-cell">
+                    <button class="delete-btn" onclick="deleteJob('{{ job.id }}')">Delete</button>
+                </div>
             </td>
         </tr>
         {% endfor %}
@@ -180,10 +200,8 @@
     </table>
 </main>
 
-<!-- Floating Add Button -->
 <button id="openModalBtn" class="floating-btn">+</button>
 
-<!-- Create Job Modal -->
 <div id="createJobModal" class="modal">
     <div class="modal-content">
         <span id="closeModalBtn" class="close-btn">&times;</span>
@@ -240,8 +258,10 @@
                     <span class="counts">(${total_audios} audios, ${active_runs} running)</span>
                 </a>
             </td>
-            <td style="text-align: right;">
-                <button class="delete-btn" onclick="deleteJob('${id}')">Delete</button>
+            <td>
+                <div class="actions-cell">
+                    <button class="delete-btn" onclick="deleteJob('${id}')">Delete</button>
+                </div>
             </td>
         `;
         jobsList.appendChild(row);

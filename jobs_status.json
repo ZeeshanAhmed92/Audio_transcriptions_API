@@ -1,1 +1,10 @@
-{}
+{
+    "108898ed-42bb-4d3f-9c3a-0bc12d09efb8": {
+        "status": "done",
+        "file": "Osman Goni 6.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 6_evaluation_report.xlsx",
+        "report_html": "Osman Goni 6_evaluation_report.html",
+        "report_summary_html": "Osman Goni 6_summary.html"
+    }
+}

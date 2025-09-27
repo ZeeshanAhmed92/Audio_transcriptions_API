@@ -18,7 +18,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Border, Alignment, PatternFill, Protection
 from utils.transciptions import (generate_html, generate_report, split_and_upload, clean_and_parse_json, process_audio_with_gemini,
-    export_report_to_excel)
+                                 export_report_to_excel, generate_improvement_summary) # Added new import
 
 load_dotenv()
 
@@ -224,6 +224,7 @@ def report_worker():
             report_json_path = os.path.join(report_job_folder, f"{base_name}_evaluation_report.json")
             report_excel_path = os.path.join(report_job_folder, f"{base_name}_evaluation_report.xlsx")
             report_html_path = os.path.join(report_job_folder, f"{base_name}_evaluation_report.html")
+            report_summary_html_path = os.path.join(report_job_folder, f"{base_name}_summary.html") # New summary path
 
             meta = {
                 "gcs_uri": None,
@@ -320,9 +321,14 @@ def report_worker():
                 if report_json:
                     with open(report_json_path, "w", encoding="utf-8") as f:
                         json.dump(report_json, f, ensure_ascii=False, indent=4)
-
+                    
+                    # Generate all report formats
                     generate_html(report_json, report_html_path)
                     export_report_to_excel(report_json, report_excel_path)
+                    # ✅ Generate the new summary HTML
+                    summary_html_content = generate_improvement_summary(report_json)
+                    with open(report_summary_html_path, "w", encoding="utf-8") as f:
+                        f.write(summary_html_content)
 
                     meta["report_done"] = True
                     with open(meta_path, "w") as f:
@@ -339,6 +345,7 @@ def report_worker():
             jobs_status[job_id]["status"] = "done"
             jobs_status[job_id]["report_excel"] = os.path.basename(report_excel_path)
             jobs_status[job_id]["report_html"] = os.path.basename(report_html_path)
+            jobs_status[job_id]["report_summary_html"] = os.path.basename(report_summary_html_path) # New path
             write_job_statuses(jobs_status)
 
         except Exception as e:
@@ -359,7 +366,7 @@ def generate_report_route():
     data = request.json
     filename = data.get("filename")
     questionaire = data.get("questionnaire")
-    job_number = str(data.get("job_id"))   # keep consistent naming
+    job_number = str(data.get("job_id"))  # keep consistent naming
 
     if not filename or not job_number or not questionaire:
         return jsonify({"error": "Filename, questionnaire, or job_id missing"}), 400
@@ -378,8 +385,9 @@ def generate_report_route():
     meta_path = os.path.join(report_folder, f"{base_name}_meta.json")
     report_excel_path = os.path.join(report_folder, f"{base_name}_evaluation_report.xlsx")
     report_html_path = os.path.join(report_folder, f"{base_name}_evaluation_report.html")
+    report_summary_html_path = os.path.join(report_folder, f"{base_name}_summary.html") # New path
 
-    # If meta exists and questionnaire matches → reuse
+    # If meta exists and questionnaire matches -> reuse
     if os.path.exists(meta_path) and os.path.exists(report_excel_path) and os.path.exists(report_html_path):
         with open(meta_path, "r") as f:
             meta = json.load(f)
@@ -390,17 +398,19 @@ def generate_report_route():
                 "file": filename,
                 "job_folder": report_folder,
                 "report_excel": os.path.basename(report_excel_path),
-                "report_html": os.path.basename(report_html_path)
+                "report_html": os.path.basename(report_html_path),
+                "report_summary_html": os.path.basename(report_summary_html_path) # New path
             }
             write_job_statuses(jobs_status)
             return jsonify({
                 "job_id": job_id,
                 "status": "done",
                 "report_excel": os.path.basename(report_excel_path),
-                "report_html": os.path.basename(report_html_path)
+                "report_html": os.path.basename(report_html_path),
+                "report_summary_html": os.path.basename(report_summary_html_path) # New path
             })
 
-    # Otherwise → enqueue fresh processing
+    # Otherwise -> enqueue fresh processing
     jobs_status[job_id] = {"status": "pending", "file": filename, "job_folder": report_folder}
     write_job_statuses(jobs_status)
     report_queue.put((job_id, filename, job_number, questionaire))
@@ -417,10 +427,10 @@ def index():
 def merge_reports():
     data = request.get_json()
     job_id = data.get("job_id")
-    files = data.get("filenames", [])
+    filenames = data.get("filenames", [])
 
-    if not job_id or not files:
-        return jsonify({"msg": "job_id and files are required"}), 400
+    if not job_id or not filenames:
+        return jsonify({"msg": "job_id and filenames are required"}), 400
 
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
     if not os.path.exists(job_report_folder):
@@ -430,28 +440,24 @@ def merge_reports():
     merged_ws_report = merged_wb.active
     merged_ws_report.title = "Merged Report"
 
-    # Create second sheet for merged summaries
     merged_ws_summary = merged_wb.create_sheet(title="Merged Summary")
 
     current_row_report = 1
     current_row_summary = 1
 
-    for filename in files:
-        report_path = os.path.join(job_report_folder, f"{filename}_evaluation_report.xlsx")
+    for filename in filenames:
+        report_path = os.path.join(job_report_folder, filename)
+
         if not os.path.exists(report_path):
-            return jsonify({"msg": f"Report not found for {filename}"}), 404
+            return jsonify({"msg": f"Report not found: {filename}"}), 404
 
         try:
             wb = load_workbook(report_path)
 
-            # -----------------
-            # Merge REPORT sheet
-            # -----------------
+            # Merge "Report" sheet
             if "Report" in wb.sheetnames:
                 ws = wb["Report"]
-
-                # Header for each file section
-                merged_ws_report.cell(row=current_row_report, column=1, value=f"Report for {filename}")
+                merged_ws_report.cell(row=current_row_report, column=1, value=f"Report: {filename}")
                 merged_ws_report.cell(row=current_row_report, column=1).font = Font(bold=True)
                 current_row_report += 1
 
@@ -467,15 +473,12 @@ def merge_reports():
                             new_cell.protection = copy.copy(cell.protection)
                     current_row_report += 1
 
-                current_row_report += 1  # blank row
+                current_row_report += 1
 
-            # -----------------
-            # Merge SUMMARY sheet
-            # -----------------
+            # Merge "Summary" sheet
             if "Summary" in wb.sheetnames:
                 ws_summary = wb["Summary"]
-
-                merged_ws_summary.cell(row=current_row_summary, column=1, value=f"Summary for {filename}")
+                merged_ws_summary.cell(row=current_row_summary, column=1, value=f"Summary: {filename}")
                 merged_ws_summary.cell(row=current_row_summary, column=1).font = Font(bold=True)
                 current_row_summary += 1
 
@@ -491,35 +494,37 @@ def merge_reports():
                             new_cell.protection = copy.copy(cell.protection)
                     current_row_summary += 1
 
-                current_row_summary += 1  # blank row
+                current_row_summary += 1
 
         except Exception as e:
-            return jsonify({"msg": f"Error reading {report_path}: {str(e)}"}), 500
+            return jsonify({"msg": f"Error reading {filename}: {str(e)}"}), 500
 
     merged_path = os.path.join(job_report_folder, f"merged_{job_id}.xlsx")
     merged_wb.save(merged_path)
 
     return send_file(merged_path, as_attachment=True)
 
+
 @app.route('/merged_html_report', methods=['POST'])
 @jwt_required()
 def merge_html_reports():
     data = request.get_json()
     job_id = data.get("job_id")
-    files = data.get("filenames", [])
+    filenames = data.get("filenames", [])
 
-    if not job_id or not files:
-        return jsonify({"msg": "job_id and files are required"}), 400
+    if not job_id or not filenames:
+        return jsonify({"msg": "job_id and filenames are required"}), 400
 
     job_report_folder = os.path.join(app.config['REPORT_FOLDER'], f"job_{job_id}")
     if not os.path.exists(job_report_folder):
         return jsonify({"msg": f"Job {job_id} report folder not found"}), 404
 
     merged_content = ""
-    for filename in files:
-        report_path = os.path.join(job_report_folder, f"{filename}_evaluation_report.html")
+    for filename in filenames:
+        report_path = os.path.join(job_report_folder, filename)
+
         if not os.path.exists(report_path):
-            return jsonify({"msg": f"Report not found for {filename}"}), 404
+            return jsonify({"msg": f"Report not found: {filename}"}), 404
 
         try:
             with open(report_path, 'r', encoding='utf-8') as f:
@@ -527,53 +532,80 @@ def merge_html_reports():
 
             merged_content += f"""
             <div class="report-section">
-                <h2>Report for {filename}</h2>
+                <h2>{filename}</h2>
                 {content}
             </div>
             """
         except Exception as e:
-            return jsonify({"msg": f"Error reading {report_path}: {str(e)}"}), 500
+            return jsonify({"msg": f"Error reading {filename}: {str(e)}"}), 500
 
-    # Create a complete HTML file with the merged content
     html_template = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Merged Report</title>
-            <style>
-                body {
-                    font-family: sans-serif;
-                    line-height: 1.6;
-                    margin: 20px;
-                }
-                .report-section {
-                    border: 1px solid #ccc;
-                    padding: 20px;
-                    margin-bottom: 20px;
-                    border-radius: 8px;
-                    background: #fafafa;
-                }
-                h1, h2 {
-                    color: #333;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Merged Evaluation Report</h1>
-            {{ merged_content | safe }}
-        </body>
-        </html>
-        """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Merged Report</title>
+        <style>
+            body { font-family: sans-serif; line-height: 1.6; margin: 20px; }
+            .report-section {
+                border: 1px solid #ccc;
+                padding: 20px;
+                margin-bottom: 20px;
+                border-radius: 8px;
+                background: #fafafa;
+            }
+            h1, h2 { color: #333; }
+        </style>
+    </head>
+    <body>
+        <h1>Merged Evaluation Report</h1>
+        {{ merged_content | safe }}
+    </body>
+    </html>
+    """
     final_html = render_template_string(html_template, merged_content=merged_content)
 
-
     merged_path = os.path.join(job_report_folder, f"merged_{job_id}.html")
-    with open(merged_path, 'w', encoding='utf-8') as f:
+    with open(merged_path, "w", encoding="utf-8") as f:
         f.write(final_html)
 
-    return send_file(merged_path, as_attachment=True)
+    return send_file(merged_path, mimetype="text/html", as_attachment=True)
+
+
+@app.route("/merged_summary_html", methods=["POST"])
+@jwt_required()
+def merged_summary_html():
+    data = request.get_json()
+    job_id = data.get("job_id")
+    filenames = data.get("filenames", [])
+
+    if not job_id or not filenames:
+        return jsonify({"error": "Missing job_id or filenames"}), 400
+
+    job_folder = os.path.join(app.config["REPORT_FOLDER"], f"job_{job_id}")
+    merged_path = os.path.join(job_folder, f"merged_summary_{job_id}.html")
+
+    merged_html = "<html><body>"
+    for filename in filenames:
+        file_path = os.path.join(job_folder, filename)  # summary.html stored in same folder
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as f:
+                merged_html += f"<h2>{filename}</h2>\n"
+                merged_html += f.read()
+                merged_html += "<hr/>"
+
+    merged_html += "</body></html>"
+
+    with open(merged_path, "w", encoding="utf-8") as f:
+        f.write(merged_html)
+
+    return send_file(
+        merged_path,
+        mimetype="text/html",
+        as_attachment=True,
+        download_name=os.path.basename(merged_path),
+    )
 
 
 @app.route("/report/<int:job_id>")
@@ -706,22 +738,22 @@ def report_status(job_id):
     base_name = os.path.splitext(filename)[0]
 
     # Expected report file names
-    report_excel_path = os.path.join(report_folder, f"{job_id}_{base_name}_evaluation_report.xlsx")
-    report_html_path = os.path.join(report_folder, f"{job_id}_{base_name}_evaluation_report.html")
+    report_excel_path = os.path.join(report_folder, f"{base_name}_evaluation_report.xlsx")
+    report_html_path = os.path.join(report_folder, f"{base_name}_evaluation_report.html")
+    report_summary_html_path = os.path.join(report_folder, f"{base_name}_summary.html") # New path
 
-    # If status is done but paths not stored yet → update jobs_status
+    # If status is done but paths not stored yet -> update jobs_status
     if job["status"] == "done":
         if os.path.exists(report_excel_path):
             job["report_excel"] = os.path.basename(report_excel_path)
         if os.path.exists(report_html_path):
             job["report_html"] = os.path.basename(report_html_path)
+        if os.path.exists(report_summary_html_path): # New path
+            job["report_summary_html"] = os.path.basename(report_summary_html_path)
         jobs_status[job_id] = job
         write_job_statuses(jobs_status)
 
     return jsonify(job)
-
-
-from flask import send_from_directory
 
 @app.route("/download_report/<job_id>/<filename>", methods=["GET"])
 def download_report(job_id, filename):
@@ -742,8 +774,16 @@ def download_html_report(job_id, filename):
         return jsonify({"error": "Report not found"}), 404
     return send_from_directory(job_folder, filename, as_attachment=True)
 
+@app.route("/download_summary_report/<job_id>/<filename>", methods=["GET"])
+def download_summary_report(job_id, filename):
+    """Download the summary HTML report for a specific job."""
+    job_folder = os.path.join(app.config["REPORT_FOLDER"], f"job_{job_id}")
+    file_path = os.path.join(job_folder, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Summary report not found"}), 404
+    return send_from_directory(job_folder, filename, as_attachment=True)
 
-# In your Flask application code
+
 @app.route("/delete_files", methods=["DELETE"])
 @jwt_required()
 def delete_files():
@@ -789,7 +829,7 @@ def delete_files():
     write_job_statuses(jobs_status)
 
     # Check if the job folder is empty and delete the job if it is
-    if not os.listdir(job_upload_folder):
+    if os.path.exists(job_upload_folder) and not os.listdir(job_upload_folder):
         delete_job_folders(job_id_folder)
         
         # Remove the job from jobs.json as well

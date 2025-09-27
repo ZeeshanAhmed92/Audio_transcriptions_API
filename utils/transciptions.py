@@ -1,49 +1,68 @@
 import os
 import re
 import json
-import time
-import grpc
 import vertexai
+import subprocess
 import pandas as pd
-from jinja2 import Template
+from jinja2 import Template, Environment, FileSystemLoader, select_autoescape
 from pydub import AudioSegment
 from google.cloud import storage
 from langchain_google_vertexai import ChatVertexAI
 from vertexai.generative_models import GenerativeModel
 from vertexai.generative_models import GenerativeModel, Part
 from langchain_core.messages import SystemMessage, HumanMessage
-from google.api_core.exceptions import GoogleAPICallError, RetryError
+
+# Common video and audio extensions
+VIDEO_EXTENSIONS = {"mp4", "mkv", "avi", "mov", "flv", "wmv", "m4v", "mpeg"}
+AUDIO_EXTENSIONS = {"wav", "mp3", "aac", "ogg", "flac", "wma", "m4a"}
+
+
+def video_to_audio(input_file: str, output_file: str):
+    """Convert a single video file to WAV 16kHz mono using ffmpeg."""
+    command = [
+        "ffmpeg",
+        "-i", input_file,
+        "-vn",                # disable video
+        "-acodec", "pcm_s16le",  # PCM WAV
+        "-ar", "16000",       # 16kHz sample rate
+        "-ac", "1",           # mono
+        output_file,
+        "-y"                  # overwrite if exists
+    ]
+    subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def audio_to_wav(input_file: str, output_file: str):
+    """Convert any audio file to WAV (16kHz mono) using ffmpeg."""
+    command = [
+        "ffmpeg",
+        "-i", input_file,
+        "-acodec", "pcm_s16le",  # PCM WAV
+        "-ar", "16000",       # 16kHz sample rate
+        "-ac", "1",           # mono
+        output_file,
+        "-y"
+    ]
+    subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000, target_formats=None):
     """
-    Split a WAV/MP3/MP4 file into chunks and export them in one or more formats (wav, mp3).
-    If input is MP4, it will be converted to WAV internally before splitting.
+    Split a WAV/MP3 file into chunks and export them in one or more formats (wav, mp3).
     """
-
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     ext = os.path.splitext(file_path)[1].replace('.', '').lower()
 
-    if ext not in ("wav", "mp3", "mp4"):
-        raise ValueError(f"split_audio() expects .wav, .mp3, or .mp4 as input, got: {ext}")
+    if ext not in ("wav", "mp3"):
+        raise ValueError(f"split_audio() expects .wav or .mp3 as input, got: {ext}")
 
     if target_formats is None:
         target_formats = ["wav"]
 
-    # Load file - pydub can read mp4 if ffmpeg is installed
-    if ext == "mp4":
-        audio = AudioSegment.from_file(file_path, format="mp4")
-        # Convert to wav before further processing
-        wav_path = os.path.join(os.path.dirname(file_path), f"{base_name}.wav")
-        audio.export(wav_path, format="wav")
-        file_path = wav_path
-        ext = "wav"
-    else:
-        audio = AudioSegment.from_file(file_path, format=ext)
-
+    audio = AudioSegment.from_file(file_path, format=ext)
     audio_length = len(audio)
     result = {}
 
@@ -88,25 +107,35 @@ def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name
 
 def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, target_formats=None) -> list:
     """
-    Converts source file to .wav if it's not .wav or .mp3.
-    Then splits and uploads each chunk to GCS.
+    Handles both video and audio input:
+    - If video (.mp4, .mkv, etc.) → convert to wav (16kHz mono).
+    - If audio but not .wav/.mp3 → convert to wav.
+    - If already .wav or .mp3 → use directly.
+    - Splits into chunks and uploads each to GCS.
     """
-    # Convert to WAV if needed
     base_name = os.path.splitext(os.path.basename(source_file_path))[0]
     ext = os.path.splitext(source_file_path)[1].replace('.', '').lower()
 
-    if ext not in ("wav", "mp3"):
-        # convert to wav
-        original_audio = AudioSegment.from_file(source_file_path)
+    # Convert video to wav
+    if ext in VIDEO_EXTENSIONS:
         converted_path = os.path.join(os.path.dirname(source_file_path), f"{base_name}.wav")
-        original_audio.export(converted_path, format="wav")
-        source_file_path = converted_path  # use the converted file going forward
+        video_to_audio(source_file_path, converted_path)
+        source_file_path = converted_path
 
-    # Split the (now validated) file
+    # Convert unsupported audio to wav
+    elif ext in AUDIO_EXTENSIONS and ext not in ("wav", "mp3"):
+        converted_path = os.path.join(os.path.dirname(source_file_path), f"{base_name}.wav")
+        audio_to_wav(source_file_path, converted_path)
+        source_file_path = converted_path
+
+    elif ext not in ("wav", "mp3"):
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    # Split audio into chunks
     chunk_dict = split_audio(source_file_path, target_formats=target_formats)
     gcs_uris = []
 
-    # Upload each chunk
+    # Upload chunks
     for _, chunk_files in chunk_dict.items():
         for chunk_file in chunk_files:
             chunk_name = os.path.basename(chunk_file)
@@ -115,6 +144,7 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
             gcs_uris.append(uri)
 
     return gcs_uris
+
 
 def generate_html(json_data, output_path):
     """
@@ -699,26 +729,83 @@ def export_report_to_excel(report_data, output_file="interview_report.xlsx"):
     print(f"✅ Report exported with Summary to {output_file} successfully.")
 
 
-def download_blob(bucket_name, source_blob_name):
-    """Downloads a blob from the bucket to a bytes object."""
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(source_blob_name)
+def generate_improvement_summary(report_data, template_name="summary_report_template.html"):
+    """
+    Generate per-audio improvement summary using Topic/Predefined_Question
+    and Evidence/Asked fields. Classification (covered/partial/missing) is already
+    given by *_Quality keys.
+    """
 
-    # Download to a bytes object and return
-    return blob.download_as_bytes()
-
-def upload_blob(bucket_name, source_file_name, destination_blob_name):
-    """Uploads a file to the bucket."""
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(destination_blob_name)
-
-    # Check if the source is a file path or a string/bytes
-    if isinstance(source_file_name, str):
-        blob.upload_from_filename(source_file_name)
+    # Ensure dict
+    if isinstance(report_data, str):
+        data = json.loads(report_data)
     else:
-        # Assumes source is a bytes-like object or file-like object
-        blob.upload_from_string(source_file_name)
+        data = report_data
 
-    print(f"File {source_file_name} uploaded to {destination_blob_name}.")
+    # Setup Jinja2
+    script_dir = os.path.dirname(__file__)
+    templates_dir = os.path.join(script_dir, "templates")
+    env = Environment(
+        loader=FileSystemLoader(templates_dir),
+        autoescape=select_autoescape(['html', 'xml'])
+    )
+    template = env.get_template(template_name)
+
+    chat = ChatVertexAI(
+        model="gemini-2.5-pro",
+        temperature=0,
+        project=os.getenv("GCP_PROJECT"),
+        location=os.getenv("GCP_LOCATION", "us-central1")
+    )
+
+    summaries = []
+    skip_phrases = ["fully asked", "explicitly stated", "fully addressed"]
+
+    for section_name, section_items in data.items():
+        if not isinstance(section_items, list):
+            continue
+
+        not_covered, partially_covered = [], []
+
+        for item in section_items:
+            label = item.get("Predefined_Question") or item.get("Topic")
+            
+            # Evidence could be a list already or a string
+            evidence = item.get("Question_asked") or item.get("Topic_Evidence") or []
+            if isinstance(evidence, str):
+                evidence = [evidence]
+
+            quality = (item.get("Question_Quality") or item.get("Topic_Quality") or "").lower().strip()
+
+            # ✅ Skip fully covered ones
+            if any(phrase in quality for phrase in skip_phrases):
+                continue
+
+            # 🔹 Generate recommendation
+            system_msg = "You are an auditor. Your job is to suggest how to improve answers."
+            human_msg = f"""
+            Expected (requirement): {label}
+            Actual evidence from transcript: {"; ".join(evidence)}
+            Coverage status: {quality}
+
+            Give a one-line recommendation about what exactly should be added/changed next time 
+            to fully satisfy the expected requirement.
+            """
+
+            response = chat.invoke([SystemMessage(content=system_msg), HumanMessage(content=human_msg)])
+            recommendation = response.content.strip()
+
+            if "not" in quality:
+                not_covered.append({"label": label, "evidence": evidence, "recommendation": recommendation})
+            elif "partially" in quality or "stated but vague" in quality:
+                partially_covered.append({"label": label, "evidence": evidence, "recommendation": recommendation})
+
+        if not_covered or partially_covered:
+            summaries.append({
+                "section": section_name,
+                "not_covered": not_covered,
+                "partially_covered": partially_covered
+            })
+
+    return template.render(summary=summaries)
+
