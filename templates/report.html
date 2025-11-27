@@ -3,20 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Audio Upload & Reports - Job {{ job_id }}</title>
+<title>Audio Upload & Reports</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
     /* --- Neon & Color Variables --- */
     :root {
-<<<<<<< Updated upstream
-        --bg-color: #f4f4f4;
-        --container-bg: #fff;
-        --text-color: #000;
-        --primary: #007bff;
-        --primary-hover: #0056b3;
-        --danger: #dc3545;
-        --danger-hover: #a71d2a;
-=======
         --bg-color: #0d0d1a;
         --container-bg: rgba(15, 15, 30, 0.9);
         --text-color: #e0f7ff;
@@ -26,7 +17,6 @@
         --primary-hover: #0052cc;
         --danger: #ff3333;
         --danger-hover: #cc0000;
->>>>>>> Stashed changes
         --success: #28a745;
         --success-glow: #39ff4e;
         --secondary: #6c757d;
@@ -47,13 +37,7 @@
         color: var(--text-color);
         transition: all 0.3s ease;
         position: relative;
-<<<<<<< Updated upstream
-        /* Updated for local image path */
-        background: url('/static/images/speech-to-text-1024x683.jpg') no-repeat center center fixed;
-        background-size: cover;
-=======
         overflow-x: hidden;
->>>>>>> Stashed changes
     }
 
     /* --- Background Video (Animation) --- */
@@ -76,11 +60,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-<<<<<<< Updated upstream
-        background-color: rgba(255, 255, 255, 0.5); /* 50% opacity light overlay */
-=======
         background-color: rgba(0, 0, 0, 0.6); /* Dark overlay for readability */
->>>>>>> Stashed changes
         z-index: 1;
     }
 
@@ -91,14 +71,6 @@
 
     .container {
         margin-top: 50px;
-<<<<<<< Updated upstream
-        background-color: transparent; /* Changed to transparent */
-        padding: 25px 35px;
-        border-radius: 12px;
-        box-shadow: none; /* Removed box-shadow */
-        max-width: 800px;
-        width: 100%;
-=======
         margin-bottom: 50px;
         background-color: var(--container-bg);
         padding: 30px 40px;
@@ -110,7 +82,6 @@
         
         max-width: 800px; /* Increased max-width */
         width: 90%;
->>>>>>> Stashed changes
         box-sizing: border-box;
     }
 
@@ -133,17 +104,10 @@
 
     /* File Input Styling */
     input[type="file"] {
-<<<<<<< Updated upstream
-        padding: 8px;
-        border: none;
-        border-radius: 6px;
-        background-color: transparent; /* Changed to transparent */
-=======
         padding: 10px;
         border: 1px solid var(--list-border);
         border-radius: 8px;
         background-color: var(--input-bg);
->>>>>>> Stashed changes
         cursor: pointer;
         margin-bottom: 15px;
         width: 100%;
@@ -182,17 +146,11 @@
         cursor: pointer;
         transition: 0.2s;
         text-align: center;
-<<<<<<< Updated upstream
-        white-space: nowrap;
-        text-decoration: none;
-        display: inline-block;
-=======
         min-width: 120px;
         white-space: nowrap;
         font-weight: bold;
         color: white;
         text-shadow: none; /* Resetting text-shadow for better contrast */
->>>>>>> Stashed changes
     }
     
     .action-btn:disabled {
@@ -247,30 +205,10 @@
         box-shadow: 0 0 15px rgba(108, 117, 125, 0.8);
     }
 
-<<<<<<< Updated upstream
-    .primary-btn { background-color: var(--primary); color: white; }
-    .delete-btn { background-color: var(--danger); color: white; }
-    .download-btn { background-color: var(--success); color: white; }
-    .secondary-btn { background-color: var(--secondary); color: white; }
-
-=======
->>>>>>> Stashed changes
     #logoutBtn {
         position: absolute;
         top: 20px;
         right: 20px;
-<<<<<<< Updated upstream
-        padding: 7px 12px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        background-color: var(--danger);
-        color: white;
-        z-index: 2;
-    }
-    #logoutBtn:hover { background-color: var(--danger-hover); }
-=======
         padding: 10px 15px;
         border-radius: 8px;
         background-color: var(--danger); 
@@ -283,28 +221,17 @@
         box-shadow: 0 0 15px rgba(255, 51, 51, 1);
     }
     
-    /* Removed #themeToggle styles */
->>>>>>> Stashed changes
-
     /* --- File List --- */
     .file-list {
         margin: 25px 0;
         padding: 0;
         list-style: none;
-<<<<<<< Updated upstream
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid #ddd; /* Light border for contrast */
-        border-radius: 8px;
-        background-color: transparent; /* Changed to transparent */
-=======
         max-height: 350px;
         overflow-y: auto;
         border: 1px solid var(--list-border);
         border-radius: 8px;
         background-color: var(--input-bg);
         box-shadow: inset 0 0 10px rgba(0, 100, 255, 0.2);
->>>>>>> Stashed changes
     }
 
     .file-list li {
@@ -312,13 +239,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-<<<<<<< Updated upstream
-        border-bottom: 1px solid #ddd; /* Light border for contrast */
-        font-size: 13px;
-=======
         border-bottom: 1px solid var(--list-border);
         font-size: 14px;
->>>>>>> Stashed changes
         color: var(--text-color);
         transition: background-color 0.2s;
     }
@@ -330,25 +252,15 @@
 
     .status {
         font-size: 13px;
-<<<<<<< Updated upstream
-        color: #555; /* Changed color for better visibility on light background */
-        margin-left: 8px;
-=======
         color: var(--primary-neon);
         margin-left: 10px;
->>>>>>> Stashed changes
         display: flex;
         align-items: center;
     }
 
     .status .spinner {
-<<<<<<< Updated upstream
-        border: 2px solid #ccc;
-        border-top: 2px solid var(--primary);
-=======
         border: 2px solid #444;
         border-top: 2px solid var(--primary-neon);
->>>>>>> Stashed changes
         border-radius: 50%;
         width: 12px;
         height: 12px;
@@ -363,14 +275,6 @@
         gap: 10px;
         justify-content: flex-start;
         flex-wrap: wrap;
-<<<<<<< Updated upstream
-    }
-
-    .questionnaire-dropdown {
-        margin-left: 6px;
-        padding: 3px;
-        background-color: transparent; /* Changed to transparent */
-=======
     }
     .button-row .action-btn {
         min-width: 90px; 
@@ -383,7 +287,6 @@
         margin-left: 10px;
         padding: 5px;
         background-color: var(--input-bg);
->>>>>>> Stashed changes
         color: var(--text-color);
         border: 1px solid var(--list-border);
         border-radius: 5px;
@@ -443,25 +346,6 @@
     }
 
     .button-block {
-<<<<<<< Updated upstream
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 18px;
-}
-
-.button-block .action-btn {
-    flex: 1 1 200px;   /* flexible, but min 200px */
-    text-align: center;
-    padding: 10px 15px;
-    white-space: nowrap; /* prevent text breaking/truncation */
-}
-
-    .button-row .action-btn {
-        min-width: unset;
-        padding: 7px 10px;
-=======
         display: flex;
         flex-direction: row;
         justify-content: center;
@@ -474,14 +358,10 @@
         flex-grow: 1;
         max-width: 180px;
         min-width: 130px;
->>>>>>> Stashed changes
     }
 </style>
 </head>
 <body>
-<<<<<<< Updated upstream
-<button id="logoutBtn">Logout</button>
-=======
 
 <video autoplay muted loop id="bg-video">
     <source src="../static/images/animation1.mp4" type="video/mp4">
@@ -490,9 +370,8 @@
 
 <button id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
 
->>>>>>> Stashed changes
 <div class="container">
-<h1>Upload Audio for Report Generation</h1>
+<h1>Upload Audio for Reports Generation</h1>
 <form id="uploadForm">
     <input type="file" name="audio_file" accept="audio/*" required>
     <button type="submit" class="primary-btn action-btn"><i class="fas fa-upload"></i> Upload File</button>
@@ -500,22 +379,16 @@
 
 <div id="messageBox"></div>
 
-<<<<<<< Updated upstream
-<h2>Uploaded Files</h2>
-<button id="refreshBtn" class="primary-btn action-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
-=======
 <hr style="border-color: var(--list-border); margin: 30px 0;">
 
 <h2>Processing & Reports</h2>
 <button id="refreshBtn" class="secondary-btn action-btn"><i class="fas fa-sync-alt"></i> Refresh List</button>
->>>>>>> Stashed changes
 <ul id="fileList" class="file-list"></ul>
 
 <div class="button-block">
     <button id="generateSelectedBtn" class="action-btn primary-btn" disabled><i class="fas fa-cogs"></i> Generate Selected</button>
     <button id="mergedReportBtn" class="action-btn download-btn" disabled><i class="fas fa-file-excel"></i> Merged Excel</button>
     <button id="mergedHtmlBtn" class="action-btn download-btn" disabled><i class="fas fa-file-code"></i> Merged HTML</button>
-    <button id="mergedSummaryBtn" class="action-btn download-btn" disabled><i class="fas fa-file-alt"></i> Merged Summary</button>
     <button id="deleteSelectedBtn" class="action-btn delete-btn" disabled><i class="fas fa-trash"></i> Delete Selected</button>
 </div>
 </div>
@@ -536,10 +409,6 @@ const confirmModal = document.getElementById("confirmModal");
 const confirmMessage = document.getElementById("confirmMessage");
 const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
-<<<<<<< Updated upstream
-=======
-// const themeToggle = document.getElementById("themeToggle"); // Removed
->>>>>>> Stashed changes
 
 let confirmCallback = null;
 let messageTimeout = null;
@@ -554,6 +423,7 @@ function showMessage(message, isError = false) {
     // Use data attribute or CSS classes for style instead of inline style when possible
     messageBox.style.backgroundColor = isError ? "#ff3333" : "#28a745"; 
 
+    // Auto-hide after 4s
     messageTimeout = setTimeout(() => {
         messageBox.style.display = "none";
     }, 4000);
@@ -573,12 +443,9 @@ function hideConfirmModal() {
 document.addEventListener("DOMContentLoaded", () => {
     // Note: job_id is injected by the server side template engine (e.g., Flask/Jinja)
     const jobId = "{{ job_id }}";
+    // const jobName = "{{ job_name }}"; // Variable for potential future JS use
     const POLL_INTERVAL = 3000;
-<<<<<<< Updated upstream
-    let fileJobs = {};
-=======
     let fileJobs = {}; 
->>>>>>> Stashed changes
     let questionnaires = [];
     let fileStatuses = {};
     const logoutBtn = document.getElementById("logoutBtn");
@@ -586,7 +453,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const generateSelectedBtn = document.getElementById("generateSelectedBtn");
     const mergedReportBtn = document.getElementById("mergedReportBtn");
     const mergedHtmlBtn = document.getElementById("mergedHtmlBtn");
-    const mergedSummaryBtn = document.getElementById("mergedSummaryBtn");
     const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
     const buttonBlock = document.querySelector(".button-block");
 
@@ -600,12 +466,6 @@ document.addEventListener("DOMContentLoaded", () => {
         hideConfirmModal();
     });
 
-<<<<<<< Updated upstream
-=======
-    /* ========== Theme Toggle (Removed) ========== */
-    // themeToggle.addEventListener("click", () => { ... });
-
->>>>>>> Stashed changes
     /* ========== Logout ========== */
     logoutBtn.addEventListener("click", async () => {
         // Use the window.location.origin to ensure full path resolution
@@ -644,76 +504,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ========== Merged Reports - Excel ========== */
     mergedReportBtn.addEventListener("click", async () => {
-<<<<<<< Updated upstream
-        const selectedCheckboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-        if (!selectedCheckboxes.length) return showMessage("Select at least one file.", true);
-=======
         const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
         if (!selectedFiles.length) return showMessage("Select at least one file.", true);
         if (!selectedFiles.every(f => fileStatuses[f] === "Done")) return showMessage("Only files with 'Done' status can be merged.", true);
->>>>>>> Stashed changes
 
-        const reportFilenames = selectedCheckboxes
-            .map(cb => fileStatuses[cb.value]?.report_excel)
-            .filter(Boolean);
-
-        if (reportFilenames.length !== selectedCheckboxes.length) {
-            return showMessage("One or more selected files do not have an Excel report yet.", true);
-        }
-
-        await downloadMergedFile("/merged_report", { job_id: parseInt(jobId), filenames: reportFilenames }, `merged_report_${jobId}.xlsx`);
-    });
-
-    mergedHtmlBtn.addEventListener("click", async () => {
-        const selectedCheckboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-        if (!selectedCheckboxes.length) return showMessage("Select at least one file.", true);
-
-        const reportFilenames = selectedCheckboxes
-            .map(cb => fileStatuses[cb.value]?.report_html)
-            .filter(Boolean);
-
-        if (reportFilenames.length !== selectedCheckboxes.length) {
-            return showMessage("One or more selected files do not have an HTML report yet.", true);
-        }
-
-        await downloadMergedFile("/merged_html_report", { job_id: parseInt(jobId), filenames: reportFilenames }, `merged_html_report_${jobId}.html`);
-    });
-    mergedSummaryBtn.addEventListener("click", async () => {
-        const selectedCheckboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-        if (!selectedCheckboxes.length) return showMessage("Select at least one file.", true);
-
-        const summaryFilenames = selectedCheckboxes
-            .map(cb => fileStatuses[cb.value]?.report_summary_html)
-            .filter(Boolean);
-
-        if (summaryFilenames.length !== selectedCheckboxes.length) {
-            return showMessage("One or more selected files do not have a summary report yet.", true);
-        }
-
-        await downloadMergedFile("/merged_summary_html", { job_id: parseInt(jobId), filenames: summaryFilenames }, `merged_summary_${jobId}.html`);
-    });
-
-    async function downloadMergedFile(endpoint, body, defaultFilename) {
         try {
-            const res = await fetch(window.location.origin + endpoint, {
+            const res = await fetch(window.location.origin + "/merged_report", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
+                body: JSON.stringify({ job_id: parseInt(jobId), filenames: selectedFiles }),
                 credentials: "same-origin"
             });
 
             if (!res.ok) {
-<<<<<<< Updated upstream
-                let msg = `Failed to generate merged report from ${endpoint}`;
-=======
                 let msg = "Failed to generate merged Excel report";
->>>>>>> Stashed changes
                 try { const j = await res.json(); msg = j.error || j.msg || msg; } catch {}
                 throw new Error(msg);
             }
 
             const disp = res.headers.get("Content-Disposition");
-            let filename = defaultFilename;
+            let filename = `merged_job_${jobId}.xlsx`;
             const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
             if (m) filename = decodeURIComponent(m[1]);
 
@@ -726,18 +536,13 @@ document.addEventListener("DOMContentLoaded", () => {
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            showMessage("Merged report downloaded successfully.");
-        } catch (e) {
-<<<<<<< Updated upstream
-            showMessage(e.message || "An error occurred while generating the report.", true);
-=======
-            showMessage(e.message || "Failed to generate merged Excel report", true);
->>>>>>> Stashed changes
-        }
-    }
 
-<<<<<<< Updated upstream
-=======
+            showMessage("Merged Excel report downloaded successfully.");
+        } catch (e) {
+            showMessage(e.message || "Failed to generate merged Excel report", true);
+        }
+    });
+
     /* ========== Merged Reports - HTML ========== */
     mergedHtmlBtn.addEventListener("click", async () => {
         const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
@@ -778,7 +583,6 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage(e.message || "Error while generating merged HTML report", true);
         }
     });
->>>>>>> Stashed changes
 
     /* ========== Delete Selected Files ========== */
     deleteSelectedBtn.addEventListener("click", async () => {
@@ -793,25 +597,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     const res = await fetch(window.location.origin + '/delete_files', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ job_id: parseInt(jobId), files: selectedFiles }),
+                        body: JSON.stringify({
+                            job_id: parseInt(jobId),
+                            files: selectedFiles
+                        }),
                         credentials: 'same-origin'
                     });
 
                     const data = await res.json();
                     if (res.ok) {
                         showMessage(`${data.deleted.length} file(s) deleted successfully.`);
-<<<<<<< Updated upstream
-=======
                         
->>>>>>> Stashed changes
                         data.deleted.forEach(deletedFile => {
                             delete fileStatuses[deletedFile];
                             delete fileJobs[deletedFile];
                         });
+                        
                         if (data.not_found.length > 0) {
                             showMessage(`Could not find: ${data.not_found.join(", ")}`, true);
                         }
-                        loadFiles();
+                        loadFiles(); // Reload file list
                     } else {
                         showMessage(data.msg || "Error deleting files.", true);
                     }
@@ -831,15 +636,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateButtonStates() {
         const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
-<<<<<<< Updated upstream
-        const statuses = checkboxes.map(cb => fileStatuses[cb.value]?.status || "Idle");
-        const allDone = checkboxes.length > 0 && statuses.every(s => s === "done");
-
-        generateSelectedBtn.disabled = !(checkboxes.length > 0 && statuses.every(s => s === "Idle" || s === "done"));
-        mergedReportBtn.disabled = !allDone;
-        mergedHtmlBtn.disabled = !allDone;
-        mergedSummaryBtn.disabled = !allDone;
-=======
         const selectedFileNames = checkboxes.map(cb => cb.value);
         const statuses = selectedFileNames.map(name => fileStatuses[name] || "Idle");
         
@@ -849,7 +645,6 @@ document.addEventListener("DOMContentLoaded", () => {
         generateSelectedBtn.disabled = !(checkboxes.length && allFilesAreIdleOrDone);
         mergedReportBtn.disabled = !(checkboxes.length && allFilesAreDone);
         mergedHtmlBtn.disabled = mergedReportBtn.disabled;
->>>>>>> Stashed changes
         deleteSelectedBtn.disabled = !checkboxes.length;
     }
 
@@ -867,13 +662,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
 
             li.innerHTML = `
-<<<<<<< Updated upstream
-                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; width: 100%;">
-                    <div style="flex: 1; min-width: 200px;">
-                        <input type="checkbox" class="file-checkbox" value="${file}">
-                        <span style="margin-left:6px; font-weight:500;">${file}</span>
-                        <select class="questionnaire-dropdown" id="q-${file}">${qOptions}</select>
-=======
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-grow: 1; gap: 15px;">
                     <div style="flex: 1; min-width: 200px; display: flex; align-items: center;">
                         <input type="checkbox" class="file-checkbox" value="${file}">
@@ -881,33 +669,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         <select class="questionnaire-dropdown" id="q-${file}">
                             ${qOptions}
                         </select>
->>>>>>> Stashed changes
                         <span class="status" id="status-${file}">Idle</span>
                     </div>
-                    <div class="button-row" id="controls-${file}">
+                    <div class="button-row">
                         <button class="generate-btn action-btn primary-btn" data-file="${file}"><i class="fas fa-cogs"></i> Generate</button>
                         <span id="download-links-${file}"></span>
-<<<<<<< Updated upstream
-                        <button class="delete-file-btn action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `;
-
-=======
                         <button class="delete-btn-single action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i> Delete</button>
                     </div>
                 </div>
             `;
             // Add event listeners within the loop
->>>>>>> Stashed changes
             li.querySelector(".file-checkbox").addEventListener("change", updateButtonStates);
+
             li.querySelector(".generate-btn").addEventListener("click", async () => {
                 const selectedQ = document.getElementById(`q-${file}`).value;
                 await initiateJob(file, selectedQ);
             });
-<<<<<<< Updated upstream
-            li.querySelector(".delete-file-btn").addEventListener("click", () => deleteSingleFile(file));
-=======
 
             // Use a distinct class for single file delete button
             li.querySelector(".delete-btn-single").addEventListener("click", () => {
@@ -936,77 +713,28 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
 
->>>>>>> Stashed changes
             list.appendChild(li);
         });
 
+        // Initial check for all statuses
         await updateAllFileStatuses();
         updateButtonStates();
-    }
-    
-    function deleteSingleFile(file) {
-        showConfirmModal(`Delete ${file}? This will also remove any generated reports.`, async confirmed => {
-            if (confirmed) {
-                try {
-                    const res = await fetch(window.location.origin + '/delete_files', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ job_id: parseInt(jobId), files: [file] }),
-                        credentials: 'same-origin'
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        showMessage(`File "${file}" deleted successfully.`);
-                        delete fileStatuses[file];
-                        delete fileJobs[file];
-                        loadFiles();
-                    } else {
-                        showMessage(data.msg || "Error deleting file.", true);
-                    }
-                } catch (error) {
-                    console.error("Deletion failed:", error);
-                    showMessage("An error occurred during deletion.", true);
-                }
-            }
-        });
     }
 
     async function initiateJob(file, questionnaire) {
         const statusEl = document.getElementById(`status-${file}`);
         const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
-<<<<<<< Updated upstream
-        
-=======
 
         // Check current status before initiating (frontend safeguard)
         if (fileStatuses[file] === "processing" || fileStatuses[file] === "queued") {
             return showMessage(`File ${file} is already ${fileStatuses[file]}.`, true);
         }
 
->>>>>>> Stashed changes
         generateBtn.disabled = true;
         statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
         fileStatuses[file] = "queued";
         updateButtonStates();
 
-<<<<<<< Updated upstream
-        const res = await fetch(window.location.origin + "/generate_report", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ filename: file, job_id: parseInt(jobId), questionnaire }),
-            credentials: "same-origin"
-        });
-        const data = await res.json();
-        if (data.job_id) {
-            fileJobs[file] = data.job_id;
-            fileStatuses[file] = { status: "queued" };
-            pollJobStatus(file);
-        } else {
-            showMessage(data.error || "Failed to initiate job", true);
-            generateBtn.disabled = false;
-            statusEl.innerHTML = "Error";
-            fileStatuses[file] = { status: "Error" };
-=======
         try {
             const res = await fetch(window.location.origin + "/generate_report", {
                 method: "POST",
@@ -1027,7 +755,6 @@ document.addEventListener("DOMContentLoaded", () => {
             statusEl.innerHTML = "Error";
             fileStatuses[file] = "Error";
             updateButtonStates();
->>>>>>> Stashed changes
         }
     }
 
@@ -1039,11 +766,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(window.location.origin + `/report_status/${uniqueJobId}`, { credentials: "same-origin" });
             const jobData = await res.json();
             
-            updateFileUI(file, jobData);
+            const statusEl = document.getElementById(`status-${file}`);
+            const downloadLinksEl = document.getElementById(`download-links-${file}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
 
-<<<<<<< Updated upstream
-            if (jobData.status !== "done" && jobData.status !== "error") {
-=======
             const currentStatus = jobData.status.toLowerCase();
             fileStatuses[file] = currentStatus;
 
@@ -1061,21 +787,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 downloadLinksEl.innerHTML = "";
             } else {
                 statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
->>>>>>> Stashed changes
                 setTimeout(() => pollJobStatus(file), POLL_INTERVAL);
             }
             updateButtonStates();
         } catch (error) {
             console.error("Error polling job status:", error);
-<<<<<<< Updated upstream
-            updateFileUI(file, { status: "Error", error: "Polling failed" });
-=======
             const statusEl = document.getElementById(`status-${file}`);
             const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
             statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Network Error`;
             generateBtn.disabled = false;
             fileStatuses[file] = "Error";
->>>>>>> Stashed changes
             updateButtonStates();
         }
     }
@@ -1086,17 +807,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.querySelectorAll(".file-checkbox").forEach(fileEl => {
             const filename = fileEl.value;
-<<<<<<< Updated upstream
-            const matchingJobEntry = Object.entries(allJobs).find(
-                ([uuid, job]) => job.file === filename && String(job.job_folder).endsWith(`job_${jobId}`)
-            );
-
-            if (matchingJobEntry) {
-                const [uuid, jobData] = matchingJobEntry;
-                fileJobs[filename] = uuid;
-                updateFileUI(filename, jobData);
-                if (jobData.status !== "done" && jobData.status !== "error") {
-=======
             const statusEl = document.getElementById(`status-${filename}`);
             const downloadLinksEl = document.getElementById(`download-links-${filename}`);
             const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
@@ -1141,55 +851,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     generateBtn.disabled = true;
                     downloadLinksEl.innerHTML = "";
                     // Start polling for this specific job if it's running/queued
->>>>>>> Stashed changes
                     setTimeout(() => pollJobStatus(filename), POLL_INTERVAL);
                 }
             } else {
-                updateFileUI(filename, { status: "Idle" });
+                statusEl.innerHTML = "Idle";
+                fileStatuses[filename] = "Idle";
+                generateBtn.disabled = false;
+                downloadLinksEl.innerHTML = "";
             }
         });
         updateButtonStates();
     }
-    
-    function updateFileUI(file, jobData) {
-        const statusEl = document.getElementById(`status-${file}`);
-        const downloadLinksEl = document.getElementById(`download-links-${file}`);
-        const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
 
-        if (!statusEl || !downloadLinksEl || !generateBtn) return;
-
-        fileStatuses[file] = jobData;
-
-        switch (jobData.status) {
-            case "done":
-                statusEl.innerHTML = "Done";
-                generateBtn.disabled = false;
-                let links = `<a class="action-btn download-btn" href="/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i> Excel</a>
-                                 <a class="action-btn download-btn" href="/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i> HTML</a>`;
-                
-                if(jobData.report_summary_html) {
-                    links += ` <a class="action-btn download-btn" href="/download_summary_report/${jobId}/${encodeURIComponent(jobData.report_summary_html)}"><i class="fas fa-download"></i> Summary</a>`;
-                }
-                downloadLinksEl.innerHTML = links;
-                delete fileJobs[file];
-                break;
-            case "error":
-                statusEl.innerHTML = `Error: ${jobData.error || "Failed"}`;
-                generateBtn.disabled = false;
-                downloadLinksEl.innerHTML = "";
-                break;
-            case "Idle":
-                statusEl.innerHTML = "Idle";
-                generateBtn.disabled = false;
-                downloadLinksEl.innerHTML = "";
-                break;
-            default:
-                statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
-                generateBtn.disabled = true;
-                downloadLinksEl.innerHTML = "";
-                break;
-        }
-    }
 
     /* ========== Init ========== */
     (async function init() {
