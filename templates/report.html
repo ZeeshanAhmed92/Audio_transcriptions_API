@@ -15,14 +15,22 @@
         --secondary-neon: #0066ff;
         --primary: #0066ff;
         --primary-hover: #0052cc;
-        --danger: #ff3333;
+        --danger: #ff3333; /* Used for core red color */
         --danger-hover: #cc0000;
         --success: #28a745;
-        --success-glow: #39ff4e;
+        --success-glow: #39ff4e; /* Used for green glow */
         --secondary: #6c757d;
         --box-shadow-neon: 0 0 10px rgba(0, 100, 255, 0.6);
         --input-bg: rgba(20, 20, 40, 0.7);
         --list-border: rgba(0, 100, 255, 0.4);
+
+        /* STATUS NEON VARIABLES */
+        --status-success-color: #00ff99; 
+        --status-success-shadow: 0 0 8px rgba(0, 255, 153, 0.9);
+        --status-error-color: var(--danger); 
+        --status-error-shadow: 0 0 10px rgba(255, 51, 51, 0.7);
+        --status-default-color: var(--primary-neon); 
+        --status-default-shadow: var(--box-shadow-neon);
     }
 
     body {
@@ -250,16 +258,58 @@
 
     .file-list li:last-child { border-bottom: none; }
 
-    .status {
-        font-size: 13px;
-        color: var(--primary-neon);
-        margin-left: 10px;
+    /* File details wrapper */
+    .file-details {
+        flex: 1; 
+        min-width: 250px; 
+        display: flex; 
+        flex-direction: column;
+    }
+
+    .file-header {
         display: flex;
         align-items: center;
+        margin-bottom: 5px; /* Space between filename/checkbox and status */
+    }
+
+    .file-name {
+        margin-left:8px; 
+        font-weight:500;
+    }
+
+    .status {
+        font-size: 13px;
+        color: var(--text-color); /* Base text color, overridden by status classes */
+        margin-left: 30px; /* Aligns under file name */
+        display: flex;
+        align-items: center;
+        font-style: italic;
+    }
+    
+    /* STATUS CLASS STYLES */
+    .status.status-done {
+        color: var(--status-success-color); 
+        text-shadow: var(--status-success-shadow);
+        font-weight: bold;
+        font-style: normal;
+    }
+
+    .status.status-error {
+        color: var(--status-error-color); 
+        text-shadow: var(--status-error-shadow);
+        font-weight: bold;
+        font-style: normal;
+    }
+
+    .status.status-processing,
+    .status.status-queued {
+        color: var(--status-default-color); 
+        text-shadow: var(--status-default-shadow);
+        font-style: normal;
     }
 
     .status .spinner {
-        border: 2px solid #444;
+        border: 2px solid rgba(0, 100, 255, 0.3);
         border-top: 2px solid var(--primary-neon);
         border-radius: 50%;
         width: 12px;
@@ -637,7 +687,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateButtonStates() {
         const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
         const selectedFileNames = checkboxes.map(cb => cb.value);
-        const statuses = selectedFileNames.map(name => fileStatuses[name] || "Idle");
+        // Only consider the major states for button logic
+        const statuses = selectedFileNames.map(name => {
+            const status = fileStatuses[name] || "Idle";
+            if (status.includes("Done")) return "Done";
+            if (status.includes("Error")) return "Error";
+            if (status.includes("Idle")) return "Idle";
+            // Group all other running states for the purpose of disabling the 'Generate' button
+            return "Running"; 
+        });
         
         const allFilesAreIdleOrDone = statuses.every(s => s === "Idle" || s === "Done" || s === "Error");
         const allFilesAreDone = statuses.every(s => s === "Done");
@@ -663,12 +721,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             li.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-grow: 1; gap: 15px;">
-                    <div style="flex: 1; min-width: 200px; display: flex; align-items: center;">
-                        <input type="checkbox" class="file-checkbox" value="${file}">
-                        <span style="margin-left:8px; font-weight:500;">${file}</span>
-                        <select class="questionnaire-dropdown" id="q-${file}">
-                            ${qOptions}
-                        </select>
+                    <div class="file-details">
+                        <div class="file-header">
+                            <input type="checkbox" class="file-checkbox" value="${file}">
+                            <span class="file-name">${file}</span>
+                            <select class="questionnaire-dropdown" id="q-${file}">
+                                ${qOptions}
+                            </select>
+                        </div>
                         <span class="status" id="status-${file}">Idle</span>
                     </div>
                     <div class="button-row">
@@ -726,13 +786,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
 
         // Check current status before initiating (frontend safeguard)
-        if (fileStatuses[file] === "processing" || fileStatuses[file] === "queued") {
-            return showMessage(`File ${file} is already ${fileStatuses[file]}.`, true);
+        const currentMajorStatus = (fileStatuses[file] || "Idle").toLowerCase();
+        if (currentMajorStatus !== "idle" && currentMajorStatus !== "done" && currentMajorStatus !== "error") {
+            return showMessage(`File ${file} is already processing.`, true);
         }
 
         generateBtn.disabled = true;
+        
+        // Use condensed status "Queued..." for initiation
+        statusEl.className = "status status-queued";
         statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
-        fileStatuses[file] = "queued";
+        
+        fileStatuses[file] = "Queued"; // Simplified status for tracking
         updateButtonStates();
 
         try {
@@ -752,11 +817,89 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             showMessage(error.message || "An error occurred during job initiation.", true);
             generateBtn.disabled = false;
-            statusEl.innerHTML = "Error";
+            
+            // Apply error styling
+            statusEl.className = "status status-error";
+            statusEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error`;
+            
             fileStatuses[file] = "Error";
             updateButtonStates();
         }
     }
+
+    // Function to update the status display and tracking key
+    function updateStatusDisplay(file, jobData) {
+        const statusEl = document.getElementById(`status-${file}`);
+        const downloadLinksEl = document.getElementById(`download-links-${file}`);
+        const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+
+        const rawStatus = jobData.status || "Idle";
+        const lowerStatus = rawStatus.toLowerCase(); 
+        
+        statusEl.className = "status"; // Reset class
+
+        if (lowerStatus === "done") {
+            statusEl.classList.add("status-done");
+            statusEl.innerHTML = `<i class="fas fa-check-circle"></i> Done`; 
+            
+            fileStatuses[file] = "Done";
+            generateBtn.disabled = false;
+            
+            let links = `
+                <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
+                <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
+            `;
+            // Add Summary button if report_summary_html is available
+            if (jobData.report_summary_html) {
+                links += `<a class="action-btn download-btn" href="${window.location.origin}/download_summary_report/${jobId}/${encodeURIComponent(jobData.report_summary_html)}"><i class="fas fa-download"></i>Summary</a>`;
+            }
+            downloadLinksEl.innerHTML = links;
+            return true; // Polling finished
+        } else if (lowerStatus === "error") {
+            statusEl.classList.add("status-error");
+            statusEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${jobData.error || "Failed"}`;
+            
+            fileStatuses[file] = "Error";
+            generateBtn.disabled = false;
+            downloadLinksEl.innerHTML = "";
+            return true; // Polling finished
+        } else if (lowerStatus === "idle") {
+             statusEl.innerHTML = "Idle";
+             fileStatuses[file] = "Idle";
+             generateBtn.disabled = false;
+             downloadLinksEl.innerHTML = "";
+             return true; // No need to poll an idle job
+        } else {
+            // Specific Running/Processing Statuses
+            statusEl.classList.add("status-processing");
+            generateBtn.disabled = true;
+            downloadLinksEl.innerHTML = "";
+
+            if (lowerStatus.includes("transcribing audio")) {
+                statusEl.innerHTML = `<span class="spinner"></span>Transcribing Audio...`;
+                fileStatuses[file] = "Transcribing Audio";
+            } else if (lowerStatus.includes("generating report")) {
+                statusEl.innerHTML = `<span class="spinner"></span>Generating Report...`;
+                fileStatuses[file] = "Generating Report";
+            } else if (lowerStatus.includes("uploading to gcs")) {
+                statusEl.innerHTML = `<span class="spinner"></span>Uploading...`;
+                fileStatuses[file] = "Uploading";
+            } else if (lowerStatus === "queued" || lowerStatus === "pending") {
+                statusEl.classList.remove("status-processing");
+                statusEl.classList.add("status-queued");
+                statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
+                fileStatuses[file] = "Queued";
+            } else {
+                // Catch-all for any other running/processing/started state
+                statusEl.innerHTML = `<span class="spinner"></span>Processing...`;
+                fileStatuses[file] = "Processing";
+            }
+            
+            // Continue polling
+            return false;
+        }
+    }
+
 
     async function pollJobStatus(file) {
         const uniqueJobId = fileJobs[file];
@@ -766,35 +909,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(window.location.origin + `/report_status/${uniqueJobId}`, { credentials: "same-origin" });
             const jobData = await res.json();
             
-            const statusEl = document.getElementById(`status-${file}`);
-            const downloadLinksEl = document.getElementById(`download-links-${file}`);
-            const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
-
-            const currentStatus = jobData.status.toLowerCase();
-            fileStatuses[file] = currentStatus;
-
-            if (currentStatus === "done") {
-                statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-glow);"></i> Done`;
-                generateBtn.disabled = false;
-                downloadLinksEl.innerHTML = `
-                    <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
-                    <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
-                `;
-                // delete fileJobs[file]; // Keep job ID until next refresh/re-run
-            } else if (currentStatus === "error") {
-                statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Error: ${jobData.error || "Failed"}`;
-                generateBtn.disabled = false;
-                downloadLinksEl.innerHTML = "";
-            } else {
-                statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
+            const finished = updateStatusDisplay(file, jobData);
+            
+            if (!finished) {
                 setTimeout(() => pollJobStatus(file), POLL_INTERVAL);
             }
+            
             updateButtonStates();
         } catch (error) {
             console.error("Error polling job status:", error);
             const statusEl = document.getElementById(`status-${file}`);
             const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
-            statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Network Error`;
+            
+            statusEl.classList.add("status-error");
+            statusEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Network Error`;
+            
             generateBtn.disabled = false;
             fileStatuses[file] = "Error";
             updateButtonStates();
@@ -807,57 +936,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.querySelectorAll(".file-checkbox").forEach(fileEl => {
             const filename = fileEl.value;
-            const statusEl = document.getElementById(`status-${filename}`);
-            const downloadLinksEl = document.getElementById(`download-links-${filename}`);
-            const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
             const dropdown = document.getElementById(`q-${filename}`);
+            const statusEl = document.getElementById(`status-${filename}`);
 
 
             const matchingJob = Object.entries(allJobs).find(
                 ([uuid, job]) => job.file === filename && job.job_number == jobId
             );
-
+            
             if (matchingJob) {
                 const [uuid, jobData] = matchingJob;
                 fileJobs[filename] = uuid;
-                const status = jobData.status.toLowerCase();
                 
                 // Set the dropdown to the questionnaire used in the last run
                 if (dropdown && jobData.questionnaire) {
                     dropdown.value = jobData.questionnaire;
                 }
                 
-                if (status === "done" && jobData.report_excel && jobData.report_html) {
-                    statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-glow);"></i> Done`;
-                    fileStatuses[filename] = "Done";
-                    generateBtn.disabled = false;
-                    downloadLinksEl.innerHTML = `
-                        <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
-                        <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
-                    `;
-                } else if (status === "error") {
-                    statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Error: ${jobData.error || "Failed"}`;
-                    fileStatuses[filename] = "Error";
-                    generateBtn.disabled = false;
-                    downloadLinksEl.innerHTML = "";
-                } else if (status === "idle") { // Only possible if the job entry exists but was never run/reset
-                    statusEl.innerHTML = "Idle";
-                    fileStatuses[filename] = "Idle";
-                    generateBtn.disabled = false;
-                    downloadLinksEl.innerHTML = "";
-                } else {
-                    statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
-                    fileStatuses[filename] = status;
-                    generateBtn.disabled = true;
-                    downloadLinksEl.innerHTML = "";
+                const finished = updateStatusDisplay(filename, jobData);
+                
+                if (!finished) {
                     // Start polling for this specific job if it's running/queued
                     setTimeout(() => pollJobStatus(filename), POLL_INTERVAL);
                 }
             } else {
+                // File exists but has no running job or recorded finished job
                 statusEl.innerHTML = "Idle";
                 fileStatuses[filename] = "Idle";
-                generateBtn.disabled = false;
-                downloadLinksEl.innerHTML = "";
+                document.querySelector(`.generate-btn[data-file="${filename}"]`).disabled = false;
+                document.getElementById(`download-links-${filename}`).innerHTML = "";
             }
         });
         updateButtonStates();

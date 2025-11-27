@@ -1,14 +1,15 @@
-<<<<<<< Updated upstream
 {
-    "ec6cfd12-0c3d-4d18-bb98-ed1e1e348b60": {
+    "3b4319d1-764a-4ce9-a887-17ddc0931220": {
+        "status": "Transcribing Audio",
+        "file": "Step 3 (1).wav",
+        "job_folder": "reports/job_1"
+    },
+    "c7b049dd-c937-459a-b53f-b3a549c372be": {
         "status": "done",
-        "file": "Osman Goni 2.m4a",
+        "file": "Step 3 (1).wav",
         "job_folder": "reports/job_1",
-        "report_excel": "Osman Goni 2_evaluation_report.xlsx",
-        "report_html": "Osman Goni 2_evaluation_report.html",
-        "report_summary_html": "Osman Goni 2_summary.html"
+        "report_excel": "Step 3 (1)_evaluation_report.xlsx",
+        "report_html": "Step 3 (1)_evaluation_report.html",
+        "report_summary_html": "Step 3 (1)_summary.html"
     }
 }
-=======
-{}
->>>>>>> Stashed changes
