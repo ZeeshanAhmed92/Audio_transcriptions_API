@@ -6,7 +6,9 @@
 <title>Audio Upload & Reports - Job {{ job_id }}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
+    /* --- Neon & Color Variables --- */
     :root {
+<<<<<<< Updated upstream
         --bg-color: #f4f4f4;
         --container-bg: #fff;
         --text-color: #000;
@@ -14,8 +16,23 @@
         --primary-hover: #0056b3;
         --danger: #dc3545;
         --danger-hover: #a71d2a;
+=======
+        --bg-color: #0d0d1a;
+        --container-bg: rgba(15, 15, 30, 0.9);
+        --text-color: #e0f7ff;
+        --primary-neon: #00aaff;
+        --secondary-neon: #0066ff;
+        --primary: #0066ff;
+        --primary-hover: #0052cc;
+        --danger: #ff3333;
+        --danger-hover: #cc0000;
+>>>>>>> Stashed changes
         --success: #28a745;
+        --success-glow: #39ff4e;
         --secondary: #6c757d;
+        --box-shadow-neon: 0 0 10px rgba(0, 100, 255, 0.6);
+        --input-bg: rgba(20, 20, 40, 0.7);
+        --list-border: rgba(0, 100, 255, 0.4);
     }
 
     body {
@@ -30,11 +47,28 @@
         color: var(--text-color);
         transition: all 0.3s ease;
         position: relative;
+<<<<<<< Updated upstream
         /* Updated for local image path */
         background: url('/static/images/speech-to-text-1024x683.jpg') no-repeat center center fixed;
         background-size: cover;
+=======
+        overflow-x: hidden;
+>>>>>>> Stashed changes
     }
 
+    /* --- Background Video (Animation) --- */
+    #bg-video {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        z-index: -2;
+        filter: brightness(40%) contrast(120%);
+    }
+
+    /* Overlay on top of video, behind content */
     body::before {
         content: '';
         position: absolute;
@@ -42,7 +76,11 @@
         left: 0;
         width: 100%;
         height: 100%;
+<<<<<<< Updated upstream
         background-color: rgba(255, 255, 255, 0.5); /* 50% opacity light overlay */
+=======
+        background-color: rgba(0, 0, 0, 0.6); /* Dark overlay for readability */
+>>>>>>> Stashed changes
         z-index: 1;
     }
 
@@ -53,21 +91,39 @@
 
     .container {
         margin-top: 50px;
+<<<<<<< Updated upstream
         background-color: transparent; /* Changed to transparent */
         padding: 25px 35px;
         border-radius: 12px;
         box-shadow: none; /* Removed box-shadow */
         max-width: 800px;
         width: 100%;
+=======
+        margin-bottom: 50px;
+        background-color: var(--container-bg);
+        padding: 30px 40px;
+        border-radius: 12px;
+        
+        /* Neon Glow Effect */
+        box-shadow: 0 0 15px rgba(0, 100, 255, 0.6);
+        border: 1px solid var(--list-border);
+        
+        max-width: 800px; /* Increased max-width */
+        width: 90%;
+>>>>>>> Stashed changes
         box-sizing: border-box;
     }
 
     h1, h2 {
         font-weight: 500;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
         text-align: center;
-        color: var(--text-color);
+        color: var(--primary-neon);
+        text-shadow: 0 0 8px var(--primary-neon); /* Neon text glow */
     }
+    
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; }
 
     form {
         display: flex;
@@ -75,64 +131,135 @@
         align-items: center;
     }
 
+    /* File Input Styling */
     input[type="file"] {
+<<<<<<< Updated upstream
         padding: 8px;
         border: none;
         border-radius: 6px;
         background-color: transparent; /* Changed to transparent */
+=======
+        padding: 10px;
+        border: 1px solid var(--list-border);
+        border-radius: 8px;
+        background-color: var(--input-bg);
+>>>>>>> Stashed changes
         cursor: pointer;
-        margin-bottom: 12px;
+        margin-bottom: 15px;
         width: 100%;
         color: var(--text-color);
-        font-size: 13px;
+        font-size: 14px;
+        transition: box-shadow 0.3s;
+    }
+
+    input[type="file"]:hover {
+        box-shadow: 0 0 8px rgba(0, 100, 255, 0.4);
     }
 
     input[type="file"]::file-selector-button {
         background-color: var(--primary);
         color: white;
         border: none;
-        padding: 6px 10px;
+        padding: 8px 12px;
         border-radius: 6px;
         cursor: pointer;
-        font-size: 13px;
+        font-size: 14px;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        box-shadow: 0 0 5px rgba(0, 100, 255, 0.5); /* Button glow */
     }
 
     input[type="file"]::file-selector-button:hover {
         background-color: var(--primary-hover);
+        box-shadow: 0 0 10px rgba(0, 100, 255, 0.8);
     }
 
-    /* Buttons */
+    /* --- Buttons (Generalized Neon) --- */
     .action-btn {
-        padding: 7px 10px;
+        padding: 10px 15px;
         border: none;
         border-radius: 6px;
-        font-size: 13px;
+        font-size: 14px;
         cursor: pointer;
         transition: 0.2s;
         text-align: center;
+<<<<<<< Updated upstream
         white-space: nowrap;
         text-decoration: none;
         display: inline-block;
+=======
+        min-width: 120px;
+        white-space: nowrap;
+        font-weight: bold;
+        color: white;
+        text-shadow: none; /* Resetting text-shadow for better contrast */
+>>>>>>> Stashed changes
     }
     
     .action-btn:disabled {
         background: #555 !important;
         cursor: not-allowed;
-    }
-    
-    .action-btn:hover:not(:disabled) {
-        opacity: 0.85;
+        box-shadow: none !important;
+        opacity: 0.7;
     }
 
+    .action-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+    }
+
+    .primary-btn { 
+        background-color: var(--primary); 
+        box-shadow: 0 0 8px rgba(0, 100, 255, 0.7);
+    }
+    .primary-btn:hover:not(:disabled) { 
+        background-color: var(--primary-hover); 
+        box-shadow: 0 0 15px rgba(0, 100, 255, 1);
+    }
+    
+    .delete-btn { 
+        background-color: var(--danger); 
+        box-shadow: 0 0 8px rgba(255, 51, 51, 0.7);
+    }
+    .delete-btn:hover:not(:disabled) { 
+        background-color: var(--danger-hover); 
+        box-shadow: 0 0 15px rgba(255, 51, 51, 1);
+    }
+    
+    .download-btn { 
+        background-color: var(--success); 
+        box-shadow: 0 0 8px rgba(40, 167, 69, 0.7);
+        text-decoration: none; 
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+    }
+    .download-btn:hover:not(:disabled) { 
+        background-color: #1e873c; 
+        box-shadow: 0 0 15px var(--success-glow);
+    }
+    
+    .secondary-btn { 
+        background-color: var(--secondary); 
+        box-shadow: 0 0 8px rgba(108, 117, 125, 0.4);
+    }
+    .secondary-btn:hover:not(:disabled) { 
+        background-color: #5a6268; 
+        box-shadow: 0 0 15px rgba(108, 117, 125, 0.8);
+    }
+
+<<<<<<< Updated upstream
     .primary-btn { background-color: var(--primary); color: white; }
     .delete-btn { background-color: var(--danger); color: white; }
     .download-btn { background-color: var(--success); color: white; }
     .secondary-btn { background-color: var(--secondary); color: white; }
 
+=======
+>>>>>>> Stashed changes
     #logoutBtn {
         position: absolute;
         top: 20px;
         right: 20px;
+<<<<<<< Updated upstream
         padding: 7px 12px;
         border: none;
         border-radius: 6px;
@@ -143,44 +270,88 @@
         z-index: 2;
     }
     #logoutBtn:hover { background-color: var(--danger-hover); }
+=======
+        padding: 10px 15px;
+        border-radius: 8px;
+        background-color: var(--danger); 
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 0 8px rgba(255, 51, 51, 0.7);
+    }
+    #logoutBtn:hover {
+        background-color: var(--danger-hover); 
+        box-shadow: 0 0 15px rgba(255, 51, 51, 1);
+    }
+    
+    /* Removed #themeToggle styles */
+>>>>>>> Stashed changes
 
+    /* --- File List --- */
     .file-list {
-        margin: 20px 0;
+        margin: 25px 0;
         padding: 0;
         list-style: none;
+<<<<<<< Updated upstream
         max-height: 300px;
         overflow-y: auto;
         border: 1px solid #ddd; /* Light border for contrast */
         border-radius: 8px;
         background-color: transparent; /* Changed to transparent */
+=======
+        max-height: 350px;
+        overflow-y: auto;
+        border: 1px solid var(--list-border);
+        border-radius: 8px;
+        background-color: var(--input-bg);
+        box-shadow: inset 0 0 10px rgba(0, 100, 255, 0.2);
+>>>>>>> Stashed changes
     }
 
     .file-list li {
-        padding: 8px 12px;
+        padding: 12px 15px;
         display: flex;
         align-items: center;
         justify-content: space-between;
+<<<<<<< Updated upstream
         border-bottom: 1px solid #ddd; /* Light border for contrast */
         font-size: 13px;
+=======
+        border-bottom: 1px solid var(--list-border);
+        font-size: 14px;
+>>>>>>> Stashed changes
         color: var(--text-color);
+        transition: background-color 0.2s;
+    }
+    .file-list li:hover {
+        background-color: rgba(0, 100, 255, 0.05);
     }
 
     .file-list li:last-child { border-bottom: none; }
 
     .status {
         font-size: 13px;
+<<<<<<< Updated upstream
         color: #555; /* Changed color for better visibility on light background */
         margin-left: 8px;
+=======
+        color: var(--primary-neon);
+        margin-left: 10px;
+>>>>>>> Stashed changes
         display: flex;
         align-items: center;
     }
 
     .status .spinner {
+<<<<<<< Updated upstream
         border: 2px solid #ccc;
         border-top: 2px solid var(--primary);
+=======
+        border: 2px solid #444;
+        border-top: 2px solid var(--primary-neon);
+>>>>>>> Stashed changes
         border-radius: 50%;
-        width: 10px;
-        height: 10px;
+        width: 12px;
+        height: 12px;
         margin-right: 6px;
         animation: spin 1s linear infinite;
     }
@@ -189,56 +360,90 @@
 
     .button-row {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         justify-content: flex-start;
         flex-wrap: wrap;
+<<<<<<< Updated upstream
     }
 
     .questionnaire-dropdown {
         margin-left: 6px;
         padding: 3px;
         background-color: transparent; /* Changed to transparent */
+=======
+    }
+    .button-row .action-btn {
+        min-width: 90px; 
+        max-width: 100px;
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    .questionnaire-dropdown {
+        margin-left: 10px;
+        padding: 5px;
+        background-color: var(--input-bg);
+>>>>>>> Stashed changes
         color: var(--text-color);
-        border: 1px solid #555;
+        border: 1px solid var(--list-border);
         border-radius: 5px;
         font-size: 13px;
+        min-width: 100px;
+        cursor: pointer;
     }
 
     /* Message box */
     #messageBox {
         margin-top: 15px;
-        padding: 10px;
-        border-radius: 6px;
+        padding: 12px;
+        border-radius: 8px;
         text-align: center;
         display: none;
-        font-size: 13px;
+        font-size: 14px;
+        font-weight: bold;
+        color: white;
+        box-shadow: 0 0 10px;
     }
-    #messageBox i { margin-right: 6px; }
+    #messageBox i { margin-right: 8px; }
+    #messageBox[style*="#ff3333"] { box-shadow: 0 0 10px var(--danger); }
+    #messageBox[style*="#28a745"] { box-shadow: 0 0 10px var(--success-glow); }
+
 
     /* Modal */
     .modal {
         display: none;
         position: fixed;
-        z-index: 100;
+        z-index: 1000;
         left: 0;
         top: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0,0,0,0.7);
+        background-color: rgba(0,0,0,0.8);
         justify-content: center;
         align-items: center;
+        backdrop-filter: blur(4px);
     }
     .modal-content {
         background-color: var(--container-bg);
-        padding: 18px;
-        border-radius: 10px;
-        width: 280px;
+        padding: 25px;
+        border-radius: 12px;
+        width: 320px;
         text-align: center;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        border: 1px solid var(--list-border);
+        box-shadow: 0 0 20px rgba(0, 100, 255, 0.9); /* Strong modal glow */
     }
-    .modal-buttons { display: flex; justify-content: space-around; margin-top: 15px; }
+    .modal-buttons { 
+        display: flex; 
+        justify-content: space-around; 
+        margin-top: 20px;
+        gap: 15px;
+    }
+    .modal-buttons .action-btn {
+        min-width: 100px;
+    }
 
     .button-block {
+<<<<<<< Updated upstream
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
@@ -256,22 +461,54 @@
     .button-row .action-btn {
         min-width: unset;
         padding: 7px 10px;
+=======
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 20px;
+        width: 100%;
+    }
+    .button-block .action-btn {
+        flex-grow: 1;
+        max-width: 180px;
+        min-width: 130px;
+>>>>>>> Stashed changes
     }
 </style>
 </head>
 <body>
+<<<<<<< Updated upstream
 <button id="logoutBtn">Logout</button>
+=======
+
+<video autoplay muted loop id="bg-video">
+    <source src="../static/images/animation1.mp4" type="video/mp4">
+    </video>
+
+
+<button id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+
+>>>>>>> Stashed changes
 <div class="container">
-<h1>Upload Audio</h1>
+<h1>Upload Audio for Report Generation</h1>
 <form id="uploadForm">
     <input type="file" name="audio_file" accept="audio/*" required>
-    <button type="submit" class="primary-btn action-btn"><i class="fas fa-upload"></i> Upload</button>
+    <button type="submit" class="primary-btn action-btn"><i class="fas fa-upload"></i> Upload File</button>
 </form>
-<p id="uploadResult"></p>
+
 <div id="messageBox"></div>
 
+<<<<<<< Updated upstream
 <h2>Uploaded Files</h2>
 <button id="refreshBtn" class="primary-btn action-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
+=======
+<hr style="border-color: var(--list-border); margin: 30px 0;">
+
+<h2>Processing & Reports</h2>
+<button id="refreshBtn" class="secondary-btn action-btn"><i class="fas fa-sync-alt"></i> Refresh List</button>
+>>>>>>> Stashed changes
 <ul id="fileList" class="file-list"></ul>
 
 <div class="button-block">
@@ -288,7 +525,7 @@
         <p id="confirmMessage"></p>
         <div class="modal-buttons">
             <button id="confirmYes" class="action-btn delete-btn"><i class="fas fa-check"></i> Yes</button>
-            <button id="confirmNo" class="action-btn primary-btn"><i class="fas fa-times"></i> No</button>
+            <button id="confirmNo" class="action-btn secondary-btn"><i class="fas fa-times"></i> No</button>
         </div>
     </div>
 </div>
@@ -299,6 +536,10 @@ const confirmModal = document.getElementById("confirmModal");
 const confirmMessage = document.getElementById("confirmMessage");
 const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
+<<<<<<< Updated upstream
+=======
+// const themeToggle = document.getElementById("themeToggle"); // Removed
+>>>>>>> Stashed changes
 
 let confirmCallback = null;
 let messageTimeout = null;
@@ -309,7 +550,9 @@ function showMessage(message, isError = false) {
     messageBox.innerHTML = isError
         ? `<i class="fas fa-exclamation-circle"></i> ${message}`
         : `<i class="fas fa-check-circle"></i> ${message}`;
-    messageBox.style.backgroundColor = isError ? "#ff3333" : "#28a745";
+    
+    // Use data attribute or CSS classes for style instead of inline style when possible
+    messageBox.style.backgroundColor = isError ? "#ff3333" : "#28a745"; 
 
     messageTimeout = setTimeout(() => {
         messageBox.style.display = "none";
@@ -328,9 +571,14 @@ function hideConfirmModal() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Note: job_id is injected by the server side template engine (e.g., Flask/Jinja)
     const jobId = "{{ job_id }}";
     const POLL_INTERVAL = 3000;
+<<<<<<< Updated upstream
     let fileJobs = {};
+=======
+    let fileJobs = {}; 
+>>>>>>> Stashed changes
     let questionnaires = [];
     let fileStatuses = {};
     const logoutBtn = document.getElementById("logoutBtn");
@@ -352,8 +600,15 @@ document.addEventListener("DOMContentLoaded", () => {
         hideConfirmModal();
     });
 
+<<<<<<< Updated upstream
+=======
+    /* ========== Theme Toggle (Removed) ========== */
+    // themeToggle.addEventListener("click", () => { ... });
+
+>>>>>>> Stashed changes
     /* ========== Logout ========== */
     logoutBtn.addEventListener("click", async () => {
+        // Use the window.location.origin to ensure full path resolution
         await fetch(window.location.origin + "/logout", { method: "POST", credentials: "same-origin" });
         window.location.href = "/";
     });
@@ -377,16 +632,26 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ========== Generate Selected ========== */
     generateSelectedBtn.addEventListener("click", async () => {
         const checkboxes = document.querySelectorAll(".file-checkbox:checked");
+        if (!checkboxes.length) return showMessage("Select at least one file.", true);
+
         for (const cb of checkboxes) {
             const selectedQ = document.getElementById(`q-${cb.value}`).value;
+            // Only initiate if status is Idle or Done (but better to rely on backend logic)
+            // For now, let the backend handle duplication, or add a check here if status is "Idle"
             await initiateJob(cb.value, selectedQ);
         }
     });
 
-    /* ========== Merged Reports ========== */
+    /* ========== Merged Reports - Excel ========== */
     mergedReportBtn.addEventListener("click", async () => {
+<<<<<<< Updated upstream
         const selectedCheckboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
         if (!selectedCheckboxes.length) return showMessage("Select at least one file.", true);
+=======
+        const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        if (!selectedFiles.length) return showMessage("Select at least one file.", true);
+        if (!selectedFiles.every(f => fileStatuses[f] === "Done")) return showMessage("Only files with 'Done' status can be merged.", true);
+>>>>>>> Stashed changes
 
         const reportFilenames = selectedCheckboxes
             .map(cb => fileStatuses[cb.value]?.report_excel)
@@ -438,7 +703,11 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (!res.ok) {
+<<<<<<< Updated upstream
                 let msg = `Failed to generate merged report from ${endpoint}`;
+=======
+                let msg = "Failed to generate merged Excel report";
+>>>>>>> Stashed changes
                 try { const j = await res.json(); msg = j.error || j.msg || msg; } catch {}
                 throw new Error(msg);
             }
@@ -459,10 +728,57 @@ document.addEventListener("DOMContentLoaded", () => {
             URL.revokeObjectURL(url);
             showMessage("Merged report downloaded successfully.");
         } catch (e) {
+<<<<<<< Updated upstream
             showMessage(e.message || "An error occurred while generating the report.", true);
+=======
+            showMessage(e.message || "Failed to generate merged Excel report", true);
+>>>>>>> Stashed changes
         }
     }
 
+<<<<<<< Updated upstream
+=======
+    /* ========== Merged Reports - HTML ========== */
+    mergedHtmlBtn.addEventListener("click", async () => {
+        const selectedFiles = Array.from(document.querySelectorAll(".file-checkbox:checked")).map(cb => cb.value);
+        if (!selectedFiles.length) return showMessage("Select at least one file.", true);
+        if (!selectedFiles.every(f => fileStatuses[f] === "Done")) return showMessage("Only files with 'Done' status can be merged.", true);
+
+        try {
+            const res = await fetch(window.location.origin + "/merged_html_report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ job_id: parseInt(jobId), filenames: selectedFiles }),
+                credentials: "same-origin"
+            });
+
+            if (!res.ok) {
+                let msg = "Failed to generate merged HTML report";
+                try { const j = await res.json(); msg = j.error || msg; } catch {}
+                throw new Error(msg);
+            }
+
+            const disp = res.headers.get("Content-Disposition");
+            let filename = `merged_report_${jobId}.html`;
+            const m = disp && disp.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+            if (m) filename = decodeURIComponent(m[1]);
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMessage("Merged HTML report downloaded successfully.");
+        } catch (e) {
+            showMessage(e.message || "Error while generating merged HTML report", true);
+        }
+    });
+>>>>>>> Stashed changes
 
     /* ========== Delete Selected Files ========== */
     deleteSelectedBtn.addEventListener("click", async () => {
@@ -471,7 +787,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return showMessage("Select at least one file to delete.", true);
         }
 
-        showConfirmModal(`Delete ${selectedFiles.length} selected files?`, async confirmed => {
+        showConfirmModal(`Delete ${selectedFiles.length} selected file(s)? This action is irreversible.`, async confirmed => {
             if (confirmed) {
                 try {
                     const res = await fetch(window.location.origin + '/delete_files', {
@@ -484,6 +800,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     const data = await res.json();
                     if (res.ok) {
                         showMessage(`${data.deleted.length} file(s) deleted successfully.`);
+<<<<<<< Updated upstream
+=======
+                        
+>>>>>>> Stashed changes
                         data.deleted.forEach(deletedFile => {
                             delete fileStatuses[deletedFile];
                             delete fileJobs[deletedFile];
@@ -511,6 +831,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateButtonStates() {
         const checkboxes = Array.from(document.querySelectorAll(".file-checkbox:checked"));
+<<<<<<< Updated upstream
         const statuses = checkboxes.map(cb => fileStatuses[cb.value]?.status || "Idle");
         const allDone = checkboxes.length > 0 && statuses.every(s => s === "done");
 
@@ -518,6 +839,17 @@ document.addEventListener("DOMContentLoaded", () => {
         mergedReportBtn.disabled = !allDone;
         mergedHtmlBtn.disabled = !allDone;
         mergedSummaryBtn.disabled = !allDone;
+=======
+        const selectedFileNames = checkboxes.map(cb => cb.value);
+        const statuses = selectedFileNames.map(name => fileStatuses[name] || "Idle");
+        
+        const allFilesAreIdleOrDone = statuses.every(s => s === "Idle" || s === "Done" || s === "Error");
+        const allFilesAreDone = statuses.every(s => s === "Done");
+
+        generateSelectedBtn.disabled = !(checkboxes.length && allFilesAreIdleOrDone);
+        mergedReportBtn.disabled = !(checkboxes.length && allFilesAreDone);
+        mergedHtmlBtn.disabled = mergedReportBtn.disabled;
+>>>>>>> Stashed changes
         deleteSelectedBtn.disabled = !checkboxes.length;
     }
 
@@ -531,30 +863,80 @@ document.addEventListener("DOMContentLoaded", () => {
 
         files.forEach(file => {
             const li = document.createElement("li");
+            // Ensure questionnaires has been fetched
             const qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
 
             li.innerHTML = `
+<<<<<<< Updated upstream
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; width: 100%;">
                     <div style="flex: 1; min-width: 200px;">
                         <input type="checkbox" class="file-checkbox" value="${file}">
                         <span style="margin-left:6px; font-weight:500;">${file}</span>
                         <select class="questionnaire-dropdown" id="q-${file}">${qOptions}</select>
+=======
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-grow: 1; gap: 15px;">
+                    <div style="flex: 1; min-width: 200px; display: flex; align-items: center;">
+                        <input type="checkbox" class="file-checkbox" value="${file}">
+                        <span style="margin-left:8px; font-weight:500;">${file}</span>
+                        <select class="questionnaire-dropdown" id="q-${file}">
+                            ${qOptions}
+                        </select>
+>>>>>>> Stashed changes
                         <span class="status" id="status-${file}">Idle</span>
                     </div>
                     <div class="button-row" id="controls-${file}">
                         <button class="generate-btn action-btn primary-btn" data-file="${file}"><i class="fas fa-cogs"></i> Generate</button>
                         <span id="download-links-${file}"></span>
+<<<<<<< Updated upstream
                         <button class="delete-file-btn action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
             `;
 
+=======
+                        <button class="delete-btn-single action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            `;
+            // Add event listeners within the loop
+>>>>>>> Stashed changes
             li.querySelector(".file-checkbox").addEventListener("change", updateButtonStates);
             li.querySelector(".generate-btn").addEventListener("click", async () => {
                 const selectedQ = document.getElementById(`q-${file}`).value;
                 await initiateJob(file, selectedQ);
             });
+<<<<<<< Updated upstream
             li.querySelector(".delete-file-btn").addEventListener("click", () => deleteSingleFile(file));
+=======
+
+            // Use a distinct class for single file delete button
+            li.querySelector(".delete-btn-single").addEventListener("click", () => {
+                showConfirmModal(`Delete file: "${file}"?`, async confirmed => {
+                    if (confirmed) {
+                         // Re-use the delete logic for a single file
+                        const res = await fetch(window.location.origin + '/delete_files', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                job_id: parseInt(jobId),
+                                files: [file]
+                            }),
+                            credentials: 'same-origin'
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showMessage(`File "${file}" deleted successfully.`);
+                            delete fileStatuses[file];
+                            delete fileJobs[file];
+                            loadFiles();
+                        } else {
+                            showMessage(data.msg || "Error deleting file.", true);
+                        }
+                    }
+                });
+            });
+
+>>>>>>> Stashed changes
             list.appendChild(li);
         });
 
@@ -592,10 +974,22 @@ document.addEventListener("DOMContentLoaded", () => {
     async function initiateJob(file, questionnaire) {
         const statusEl = document.getElementById(`status-${file}`);
         const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+<<<<<<< Updated upstream
         
+=======
+
+        // Check current status before initiating (frontend safeguard)
+        if (fileStatuses[file] === "processing" || fileStatuses[file] === "queued") {
+            return showMessage(`File ${file} is already ${fileStatuses[file]}.`, true);
+        }
+
+>>>>>>> Stashed changes
         generateBtn.disabled = true;
         statusEl.innerHTML = `<span class="spinner"></span>Queued...`;
+        fileStatuses[file] = "queued";
+        updateButtonStates();
 
+<<<<<<< Updated upstream
         const res = await fetch(window.location.origin + "/generate_report", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -612,8 +1006,29 @@ document.addEventListener("DOMContentLoaded", () => {
             generateBtn.disabled = false;
             statusEl.innerHTML = "Error";
             fileStatuses[file] = { status: "Error" };
+=======
+        try {
+            const res = await fetch(window.location.origin + "/generate_report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filename: file, job_id: parseInt(jobId), questionnaire }),
+                credentials: "same-origin"
+            });
+            const data = await res.json();
+            if (data.job_id) {
+                fileJobs[file] = data.job_id;
+                pollJobStatus(file);
+            } else {
+                throw new Error(data.error || "Failed to initiate job.");
+            }
+        } catch (error) {
+            showMessage(error.message || "An error occurred during job initiation.", true);
+            generateBtn.disabled = false;
+            statusEl.innerHTML = "Error";
+            fileStatuses[file] = "Error";
+            updateButtonStates();
+>>>>>>> Stashed changes
         }
-        updateButtonStates();
     }
 
     async function pollJobStatus(file) {
@@ -626,13 +1041,41 @@ document.addEventListener("DOMContentLoaded", () => {
             
             updateFileUI(file, jobData);
 
+<<<<<<< Updated upstream
             if (jobData.status !== "done" && jobData.status !== "error") {
+=======
+            const currentStatus = jobData.status.toLowerCase();
+            fileStatuses[file] = currentStatus;
+
+            if (currentStatus === "done") {
+                statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-glow);"></i> Done`;
+                generateBtn.disabled = false;
+                downloadLinksEl.innerHTML = `
+                    <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
+                    <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
+                `;
+                // delete fileJobs[file]; // Keep job ID until next refresh/re-run
+            } else if (currentStatus === "error") {
+                statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Error: ${jobData.error || "Failed"}`;
+                generateBtn.disabled = false;
+                downloadLinksEl.innerHTML = "";
+            } else {
+                statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
+>>>>>>> Stashed changes
                 setTimeout(() => pollJobStatus(file), POLL_INTERVAL);
             }
             updateButtonStates();
         } catch (error) {
             console.error("Error polling job status:", error);
+<<<<<<< Updated upstream
             updateFileUI(file, { status: "Error", error: "Polling failed" });
+=======
+            const statusEl = document.getElementById(`status-${file}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+            statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Network Error`;
+            generateBtn.disabled = false;
+            fileStatuses[file] = "Error";
+>>>>>>> Stashed changes
             updateButtonStates();
         }
     }
@@ -643,6 +1086,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.querySelectorAll(".file-checkbox").forEach(fileEl => {
             const filename = fileEl.value;
+<<<<<<< Updated upstream
             const matchingJobEntry = Object.entries(allJobs).find(
                 ([uuid, job]) => job.file === filename && String(job.job_folder).endsWith(`job_${jobId}`)
             );
@@ -652,6 +1096,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 fileJobs[filename] = uuid;
                 updateFileUI(filename, jobData);
                 if (jobData.status !== "done" && jobData.status !== "error") {
+=======
+            const statusEl = document.getElementById(`status-${filename}`);
+            const downloadLinksEl = document.getElementById(`download-links-${filename}`);
+            const generateBtn = document.querySelector(`.generate-btn[data-file="${filename}"]`);
+            const dropdown = document.getElementById(`q-${filename}`);
+
+
+            const matchingJob = Object.entries(allJobs).find(
+                ([uuid, job]) => job.file === filename && job.job_number == jobId
+            );
+
+            if (matchingJob) {
+                const [uuid, jobData] = matchingJob;
+                fileJobs[filename] = uuid;
+                const status = jobData.status.toLowerCase();
+                
+                // Set the dropdown to the questionnaire used in the last run
+                if (dropdown && jobData.questionnaire) {
+                    dropdown.value = jobData.questionnaire;
+                }
+                
+                if (status === "done" && jobData.report_excel && jobData.report_html) {
+                    statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-glow);"></i> Done`;
+                    fileStatuses[filename] = "Done";
+                    generateBtn.disabled = false;
+                    downloadLinksEl.innerHTML = `
+                        <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
+                        <a class="action-btn download-btn" href="${window.location.origin}/download_html_report/${jobId}/${encodeURIComponent(jobData.report_html)}"><i class="fas fa-download"></i>HTML</a>
+                    `;
+                } else if (status === "error") {
+                    statusEl.innerHTML = `<i class="fas fa-exclamation-circle" style="color: var(--danger);"></i> Error: ${jobData.error || "Failed"}`;
+                    fileStatuses[filename] = "Error";
+                    generateBtn.disabled = false;
+                    downloadLinksEl.innerHTML = "";
+                } else if (status === "idle") { // Only possible if the job entry exists but was never run/reset
+                    statusEl.innerHTML = "Idle";
+                    fileStatuses[filename] = "Idle";
+                    generateBtn.disabled = false;
+                    downloadLinksEl.innerHTML = "";
+                } else {
+                    statusEl.innerHTML = `<span class="spinner"></span>${jobData.status}`;
+                    fileStatuses[filename] = status;
+                    generateBtn.disabled = true;
+                    downloadLinksEl.innerHTML = "";
+                    // Start polling for this specific job if it's running/queued
+>>>>>>> Stashed changes
                     setTimeout(() => pollJobStatus(filename), POLL_INTERVAL);
                 }
             } else {
