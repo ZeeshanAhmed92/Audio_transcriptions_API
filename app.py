@@ -133,6 +133,28 @@ def get_questions():
         if os.path.isfile(os.path.join(questions_dir, f))
     ]
     return jsonify(files)
+    
+# ✅ NEW ROUTE: API endpoint to signal cancellation for a single job
+@app.route("/cancel_report/<job_uuid>", methods=["POST"])
+@jwt_required()
+def cancel_report(job_uuid):
+    if job_uuid not in jobs_status:
+        return jsonify({"error": "Job not found or already completed/cancelled"}), 404
+
+    current_status = jobs_status[job_uuid]["status"].lower()
+    
+    # Check if the job is in a cancelable state
+    if current_status in ["done", "error", "cancelled", "cancelling"]:
+        return jsonify({"msg": f"Job is already in {current_status} state."}), 200
+
+    # Signal cancellation
+    with cancellation_lock:
+        jobs_to_cancel.add(job_uuid)
+        jobs_status[job_uuid]["status"] = "cancelling" # Update status immediately
+
+    write_job_statuses(jobs_status)
+    return jsonify({"msg": f"Cancellation signal sent for job {job_uuid}. Status updated to 'cancelling'."}), 200
+
 
 @app.route("/delete_job/<int:job_id>", methods=["DELETE"])
 @jwt_required()
@@ -189,21 +211,27 @@ def delete_job(job_id):
 def report_worker():
     while True:
         job_id, filename, job_number, questionaire = report_queue.get()
+        # Flag to track if the job should be marked as done (cancelled, finished, or errored)
+        job_handled = False 
+        
         try:
             # Check for cancellation at the start
             with cancellation_lock:
                 if job_id in jobs_to_cancel:
                     print(f"[Worker] Job {job_id} was cancelled. Skipping.")
                     jobs_to_cancel.remove(job_id)
-                    jobs_status[job_id]["status"] = "cancelled"
-                    jobs_status[job_id]["error"] = "Job was deleted by user."
-                    write_job_statuses(jobs_status)
-                    report_queue.task_done()
+                    # ✅ FIX: Check if job_id is still in jobs_status before accessing
+                    if job_id in jobs_status:
+                        jobs_status[job_id]["status"] = "cancelled"
+                        jobs_status[job_id]["error"] = "Job was cancelled by user."
+                        write_job_statuses(jobs_status)
+                    # ❌ REMOVED: report_queue.task_done()
+                    job_handled = True # Indicate we handled the job
                     continue
 
             if job_id not in jobs_status:
-                print(f"[Worker] Warning: job_id {job_id} not found in jobs_status")
-                report_queue.task_done()
+                print(f"[Worker] Warning: job_id {job_id} not found in jobs_status (likely deleted).")
+                job_handled = True
                 continue
 
             jobs_status[job_id]["status"] = "Processing"
@@ -262,10 +290,13 @@ def report_worker():
                 if job_id in jobs_to_cancel:
                     print(f"[Worker] Job {job_id} cancelled during GCS upload. Skipping.")
                     jobs_to_cancel.remove(job_id)
-                    jobs_status[job_id]["status"] = "cancelled"
-                    jobs_status[job_id]["error"] = "Job was deleted by user."
-                    write_job_statuses(jobs_status)
-                    report_queue.task_done()
+                    # ✅ FIX: Check if job_id is still in jobs_status before accessing
+                    if job_id in jobs_status:
+                        jobs_status[job_id]["status"] = "cancelled"
+                        jobs_status[job_id]["error"] = "Job was cancelled by user."
+                        write_job_statuses(jobs_status)
+                    # ❌ REMOVED: report_queue.task_done()
+                    job_handled = True
                     continue
 
             # --- Step 2: Transcription ---
@@ -291,6 +322,7 @@ def report_worker():
                     jobs_status[job_id]["status"] = "error"
                     jobs_status[job_id]["error"] = "Transcription failed"
                     write_job_statuses(jobs_status)
+                    job_handled = True
                     continue
             else:
                 print("[Worker] Transcription already done.")
@@ -300,10 +332,13 @@ def report_worker():
                 if job_id in jobs_to_cancel:
                     print(f"[Worker] Job {job_id} cancelled during transcription. Skipping.")
                     jobs_to_cancel.remove(job_id)
-                    jobs_status[job_id]["status"] = "cancelled"
-                    jobs_status[job_id]["error"] = "Job was deleted by user."
-                    write_job_statuses(jobs_status)
-                    report_queue.task_done()
+                    # ✅ FIX: Check if job_id is still in jobs_status before accessing
+                    if job_id in jobs_status:
+                        jobs_status[job_id]["status"] = "cancelled"
+                        jobs_status[job_id]["error"] = "Job was cancelled by user."
+                        write_job_statuses(jobs_status)
+                    # ❌ REMOVED: report_queue.task_done()
+                    job_handled = True
                     continue
 
             # --- Step 3: Report Generation ---
@@ -337,6 +372,7 @@ def report_worker():
                     jobs_status[job_id]["status"] = "error"
                     jobs_status[job_id]["error"] = "Report generation failed"
                     write_job_statuses(jobs_status)
+                    job_handled = True
                     continue
             else:
                 print("[Worker] Report already generated.")
@@ -347,16 +383,21 @@ def report_worker():
             jobs_status[job_id]["report_html"] = os.path.basename(report_html_path)
             jobs_status[job_id]["report_summary_html"] = os.path.basename(report_summary_html_path) # New path
             write_job_statuses(jobs_status)
+            job_handled = True # Job completed successfully
 
         except Exception as e:
             print(f"[Worker] Error: {e}")
             traceback.print_exc()
+            # ✅ FIX: Check if job_id is still in jobs_status before accessing
             if job_id in jobs_status:
                 jobs_status[job_id]["status"] = "error"
                 jobs_status[job_id]["error"] = str(e)
                 write_job_statuses(jobs_status)
+            job_handled = True # Job handled with an error
         finally:
-            report_queue.task_done()
+            # ✅ FIX: Only call task_done once at the end of the job processing
+            if job_handled:
+                report_queue.task_done()
 
 threading.Thread(target=report_worker, daemon=True).start()
 
@@ -834,7 +875,9 @@ def delete_files():
         
         # Remove the job from jobs.json as well
         jobs = read_jobs()
-        jobs = [job for job in jobs if job["id"] != job_id_folder]
+        # FIX: Convert job_id_folder (string) to int before comparison
+        job_id_int = int(job_id_folder)
+        jobs = [job for job in jobs if job["id"] != job_id_int]
         write_jobs(jobs)
 
     return jsonify({

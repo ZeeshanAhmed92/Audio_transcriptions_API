@@ -190,6 +190,17 @@
         box-shadow: 0 0 15px rgba(255, 51, 51, 1);
     }
     
+    /* NEW CANCEL BUTTON STYLING - RED */
+    .cancel-btn {
+        background-color: var(--danger);
+        box-shadow: 0 0 8px rgba(255, 51, 51, 0.7);
+    }
+    .cancel-btn:hover:not(:disabled) {
+        background-color: var(--danger-hover);
+        box-shadow: 0 0 15px rgba(255, 51, 51, 1);
+    }
+    /* END NEW CANCEL BUTTON STYLING */
+
     .download-btn { 
         background-color: var(--success); 
         box-shadow: 0 0 8px rgba(40, 167, 69, 0.7);
@@ -691,7 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const statuses = selectedFileNames.map(name => {
             const status = fileStatuses[name] || "Idle";
             if (status.includes("Done")) return "Done";
-            if (status.includes("Error")) return "Error";
+            if (status.includes("Error") || status.includes("Cancelled")) return "Error"; // Treat cancelled like an error for generation
             if (status.includes("Idle")) return "Idle";
             // Group all other running states for the purpose of disabling the 'Generate' button
             return "Running"; 
@@ -719,6 +730,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ensure questionnaires has been fetched
             const qOptions = questionnaires.map(q => `<option value="${q}">${q}</option>`).join("");
 
+            // MODIFICATION: Used 'cancel-btn' class for red styling
             li.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-grow: 1; gap: 15px;">
                     <div class="file-details">
@@ -733,6 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <div class="button-row">
                         <button class="generate-btn action-btn primary-btn" data-file="${file}"><i class="fas fa-cogs"></i> Generate</button>
+                        <button class="cancel-btn-single action-btn cancel-btn" data-file="${file}" id="cancel-btn-${file}" disabled><i class="fas fa-times-circle"></i> Cancel</button>
                         <span id="download-links-${file}"></span>
                         <button class="delete-btn-single action-btn delete-btn" data-file="${file}"><i class="fas fa-trash"></i> Delete</button>
                     </div>
@@ -744,6 +757,35 @@ document.addEventListener("DOMContentLoaded", () => {
             li.querySelector(".generate-btn").addEventListener("click", async () => {
                 const selectedQ = document.getElementById(`q-${file}`).value;
                 await initiateJob(file, selectedQ);
+            });
+            
+            // Event listener for single file cancel button
+            li.querySelector(".cancel-btn-single").addEventListener("click", () => {
+                const file = li.querySelector(".cancel-btn-single").dataset.file;
+                const job_uuid = fileJobs[file];
+                if (!job_uuid) return showMessage(`No active job found for ${file}`, true);
+
+                showConfirmModal(`Cancel processing for file: "${file}"?`, async confirmed => {
+                    if (confirmed) {
+                        try {
+                            const res = await fetch(window.location.origin + `/cancel_report/${job_uuid}`, {
+                                method: 'POST',
+                                credentials: 'same-origin'
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                                showMessage(data.msg);
+                            } else {
+                                showMessage(data.error || data.msg || "Error sending cancel signal.", true);
+                            }
+                            // Call to refresh statuses, which will pick up the 'cancelling' state
+                            updateAllFileStatuses(); 
+                        } catch (error) {
+                            console.error("Cancellation failed:", error);
+                            showMessage("An error occurred during cancellation.", true);
+                        }
+                    }
+                });
             });
 
             // Use a distinct class for single file delete button
@@ -784,14 +826,20 @@ document.addEventListener("DOMContentLoaded", () => {
     async function initiateJob(file, questionnaire) {
         const statusEl = document.getElementById(`status-${file}`);
         const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+        
+        // MODIFICATION: Get the cancel button
+        const cancelBtn = document.getElementById(`cancel-btn-${file}`);
 
         // Check current status before initiating (frontend safeguard)
         const currentMajorStatus = (fileStatuses[file] || "Idle").toLowerCase();
-        if (currentMajorStatus !== "idle" && currentMajorStatus !== "done" && currentMajorStatus !== "error") {
+        if (currentMajorStatus !== "idle" && currentMajorStatus !== "done" && currentMajorStatus !== "error" && currentMajorStatus !== "cancelled") {
             return showMessage(`File ${file} is already processing.`, true);
         }
 
         generateBtn.disabled = true;
+        
+        // Enable cancel button immediately when queuing
+        if (cancelBtn) cancelBtn.disabled = false;
         
         // Use condensed status "Queued..." for initiation
         statusEl.className = "status status-queued";
@@ -817,6 +865,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             showMessage(error.message || "An error occurred during job initiation.", true);
             generateBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = true;
             
             // Apply error styling
             statusEl.className = "status status-error";
@@ -832,6 +881,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusEl = document.getElementById(`status-${file}`);
         const downloadLinksEl = document.getElementById(`download-links-${file}`);
         const generateBtn = document.querySelector(`.generate-btn[data-file="${file}"]`);
+        
+        // MODIFICATION: Get the cancel button
+        const cancelBtn = document.getElementById(`cancel-btn-${file}`);
 
         const rawStatus = jobData.status || "Idle";
         const lowerStatus = rawStatus.toLowerCase(); 
@@ -840,10 +892,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (lowerStatus === "done") {
             statusEl.classList.add("status-done");
-            statusEl.innerHTML = `<i class="fas fa-check-circle"></i> Done`; 
+            statusEl.innerHTML = `<i class="fas fa-check-circle"></i>&nbsp;Done`; 
             
             fileStatuses[file] = "Done";
             generateBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = true; // Disable cancel when done
             
             let links = `
                 <a class="action-btn download-btn" href="${window.location.origin}/download_report/${jobId}/${encodeURIComponent(jobData.report_excel)}"><i class="fas fa-download"></i>Excel</a>
@@ -861,12 +914,34 @@ document.addEventListener("DOMContentLoaded", () => {
             
             fileStatuses[file] = "Error";
             generateBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = true; // Disable cancel when errored
             downloadLinksEl.innerHTML = "";
             return true; // Polling finished
-        } else if (lowerStatus === "idle") {
+        } 
+        
+        // Handle Cancelled Statuses
+        else if (lowerStatus === "cancelled") { 
+            statusEl.classList.add("status-error"); 
+            statusEl.innerHTML = `<i class="fas fa-times-circle"></i>&nbsp;Cancelled`;
+            fileStatuses[file] = "Cancelled";
+            generateBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = true; // Disable cancel when cancelled
+            downloadLinksEl.innerHTML = "";
+            return true; // Polling finished
+        } else if (lowerStatus === "cancelling") { 
+            statusEl.classList.add("status-processing");
+            statusEl.innerHTML = `<span class="spinner"></span> Cancelling...`;
+            fileStatuses[file] = "Cancelling";
+            generateBtn.disabled = true;
+            if (cancelBtn) cancelBtn.disabled = true; // Disabled while waiting for confirmation
+            return false; // Keep polling until status is 'cancelled'
+        } 
+        
+        else if (lowerStatus === "idle") {
              statusEl.innerHTML = "Idle";
              fileStatuses[file] = "Idle";
              generateBtn.disabled = false;
+             if (cancelBtn) cancelBtn.disabled = true; // Disable cancel when idle
              downloadLinksEl.innerHTML = "";
              return true; // No need to poll an idle job
         } else {
@@ -895,6 +970,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 fileStatuses[file] = "Processing";
             }
             
+            // MODIFICATION: Enable cancel button if process is active
+            if (cancelBtn) cancelBtn.disabled = false;
+            // END MODIFICATION
+
             // Continue polling
             return false;
         }
@@ -938,6 +1017,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const filename = fileEl.value;
             const dropdown = document.getElementById(`q-${filename}`);
             const statusEl = document.getElementById(`status-${filename}`);
+            
+            // MODIFICATION: Get the cancel button
+            const cancelBtn = document.getElementById(`cancel-btn-${filename}`);
 
 
             const matchingJob = Object.entries(allJobs).find(
@@ -965,6 +1047,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 fileStatuses[filename] = "Idle";
                 document.querySelector(`.generate-btn[data-file="${filename}"]`).disabled = false;
                 document.getElementById(`download-links-${filename}`).innerHTML = "";
+                // MODIFICATION: Ensure cancel button is disabled when idle
+                if (cancelBtn) cancelBtn.disabled = true;
             }
         });
         updateButtonStates();

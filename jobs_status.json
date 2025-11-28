@@ -11,5 +11,29 @@
         "report_excel": "Step 3 (1)_evaluation_report.xlsx",
         "report_html": "Step 3 (1)_evaluation_report.html",
         "report_summary_html": "Step 3 (1)_summary.html"
+    },
+    "6d6b1f98-8541-4ec4-8ee5-a87f7ec3e085": {
+        "status": "cancelled",
+        "file": "Osman Goni 2.m4a",
+        "job_folder": "reports/job_1",
+        "error": "Job was deleted by user."
+    },
+    "e7d9c021-3c2d-441f-9cac-30f16acc053f": {
+        "status": "done",
+        "job_id": "e7d9c021-3c2d-441f-9cac-30f16acc053f",
+        "file": "Osman Goni 2.m4a",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 2_evaluation_report.xlsx",
+        "report_html": "Osman Goni 2_evaluation_report.html",
+        "report_summary_html": "Osman Goni 2_summary.html"
+    },
+    "7872fb48-2ee4-41b3-a779-1479711889ba": {
+        "status": "done",
+        "job_id": "7872fb48-2ee4-41b3-a779-1479711889ba",
+        "file": "Osman Goni 2.wav",
+        "job_folder": "reports/job_1",
+        "report_excel": "Osman Goni 2_evaluation_report.xlsx",
+        "report_html": "Osman Goni 2_evaluation_report.html",
+        "report_summary_html": "Osman Goni 2_summary.html"
     }
 }
