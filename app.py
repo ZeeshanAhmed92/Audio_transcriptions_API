@@ -487,10 +487,14 @@ def merge_reports():
     current_row_summary = 1
 
     for filename in filenames:
-        report_path = os.path.join(job_report_folder, filename)
-
+        # --- START FIX ---
+        base_name = os.path.splitext(filename)[0]
+        report_path = os.path.join(job_report_folder, f"{base_name}_evaluation_report.xlsx")
+        # --- END FIX ---
+        
         if not os.path.exists(report_path):
-            return jsonify({"msg": f"Report not found: {filename}"}), 404
+            # This will now correctly check for the .xlsx file
+            return jsonify({"msg": f"Excel Report not found for file: {filename}"}), 404
 
         try:
             wb = load_workbook(report_path)
@@ -562,10 +566,14 @@ def merge_html_reports():
 
     merged_content = ""
     for filename in filenames:
-        report_path = os.path.join(job_report_folder, filename)
-
+        # --- START FIX ---
+        base_name = os.path.splitext(filename)[0]
+        report_path = os.path.join(job_report_folder, f"{base_name}_evaluation_report.html")
+        # --- END FIX ---
+        
         if not os.path.exists(report_path):
-            return jsonify({"msg": f"Report not found: {filename}"}), 404
+            # This will now correctly check for the .xlsx file
+            return jsonify({"msg": f"HTML Report not found for file: {filename}"}), 404
 
         try:
             with open(report_path, 'r', encoding='utf-8') as f:
