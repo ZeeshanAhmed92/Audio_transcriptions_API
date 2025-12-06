@@ -18,7 +18,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Border, Alignment, PatternFill, Protection
 from utils.transciptions import (generate_html, generate_report, split_and_upload, clean_and_parse_json, process_audio_with_gemini,
-                                 export_report_to_excel, generate_improvement_summary) # Added new import
+                                 export_report_to_excel, generate_improvement_summary, delete_gcs_folder)
 
 load_dotenv()
 
@@ -210,6 +210,7 @@ def delete_job(job_id):
 
 def report_worker():
     while True:
+        # NOTE: job_id, filename, job_number, questionaire are retrieved here
         job_id, filename, job_number, questionaire = report_queue.get()
         # Flag to track if the job should be marked as done (cancelled, finished, or errored)
         job_handled = False 
@@ -220,11 +221,22 @@ def report_worker():
                 if job_id in jobs_to_cancel:
                     print(f"[Worker] Job {job_id} was cancelled. Skipping.")
                     jobs_to_cancel.remove(job_id)
+                    
                     # ✅ FIX: Check if job_id is still in jobs_status before accessing
                     if job_id in jobs_status:
+                        # --- GCS Cleanup (Cancellation Path 1) ---
+                        if jobs_status[job_id].get("gcs_uri"):
+                            try:
+                                print(f"[Worker] Cleaning up GCS files for cancelled job {job_id}.")
+                                # delete_gcs_folder requires the first URI, which represents the folder prefix
+                                delete_gcs_folder(jobs_status[job_id]["gcs_uri"][0])
+                            except Exception as cleanup_e:
+                                print(f"[Worker] WARNING: GCS cleanup failed (Cancel Path 1) for job {job_id}: {cleanup_e}")
+
                         jobs_status[job_id]["status"] = "cancelled"
                         jobs_status[job_id]["error"] = "Job was cancelled by user."
                         write_job_statuses(jobs_status)
+                        
                     # ❌ REMOVED: report_queue.task_done()
                     job_handled = True # Indicate we handled the job
                     continue
@@ -272,6 +284,7 @@ def report_worker():
                     "report_done": False,
                     "questionaire": questionaire
                 }
+                # NOTE: If GCS cleanup is needed here, you would add it based on the old meta data before resetting it.
 
             # --- Step 1: Upload to GCS ---
             if not meta.get("gcs_uri"):
@@ -292,9 +305,18 @@ def report_worker():
                     jobs_to_cancel.remove(job_id)
                     # ✅ FIX: Check if job_id is still in jobs_status before accessing
                     if job_id in jobs_status:
+                        # --- GCS Cleanup (Cancellation Path 2) ---
+                        if meta.get("gcs_uri"):
+                            try:
+                                print(f"[Worker] Cleaning up GCS files for cancelled job {job_id}.")
+                                delete_gcs_folder(meta["gcs_uri"][0])
+                            except Exception as cleanup_e:
+                                print(f"[Worker] WARNING: GCS cleanup failed (Cancel Path 2) for job {job_id}: {cleanup_e}")
+
                         jobs_status[job_id]["status"] = "cancelled"
                         jobs_status[job_id]["error"] = "Job was cancelled by user."
                         write_job_statuses(jobs_status)
+                        
                     # ❌ REMOVED: report_queue.task_done()
                     job_handled = True
                     continue
@@ -306,6 +328,10 @@ def report_worker():
                 print(f"[Worker] Transcribing {filename}...")
 
                 all_transcriptions = []
+                # Ensure meta["gcs_uri"] exists and is iterable
+                if not meta.get("gcs_uri"):
+                    raise ValueError("GCS URI list is missing from metadata.")
+
                 for uri in meta["gcs_uri"]:
                     raw_transcription = process_audio_with_gemini(PROJECT_ID, LOCATION, uri)
                     parsed = clean_and_parse_json(raw_transcription)
@@ -334,9 +360,18 @@ def report_worker():
                     jobs_to_cancel.remove(job_id)
                     # ✅ FIX: Check if job_id is still in jobs_status before accessing
                     if job_id in jobs_status:
+                        # --- GCS Cleanup (Cancellation Path 3) ---
+                        if meta.get("gcs_uri"):
+                            try:
+                                print(f"[Worker] Cleaning up GCS files for cancelled job {job_id}.")
+                                delete_gcs_folder(meta["gcs_uri"][0])
+                            except Exception as cleanup_e:
+                                print(f"[Worker] WARNING: GCS cleanup failed (Cancel Path 3) for job {job_id}: {cleanup_e}")
+                        
                         jobs_status[job_id]["status"] = "cancelled"
                         jobs_status[job_id]["error"] = "Job was cancelled by user."
                         write_job_statuses(jobs_status)
+                        
                     # ❌ REMOVED: report_queue.task_done()
                     job_handled = True
                     continue
@@ -377,6 +412,29 @@ def report_worker():
             else:
                 print("[Worker] Report already generated.")
 
+            # =========================================================
+            # FINAL STEP: GCS Cleanup (Success Path)
+            # =========================================================
+            if meta.get("gcs_uri"):
+                try:
+                    gcs_file_uri = meta["gcs_uri"][0]
+                    jobs_status[job_id]["status"] = "Cleaning up GCS"
+                    write_job_statuses(jobs_status)
+                    print(f"[Worker] Starting GCS cleanup for {gcs_file_uri}...")
+                    
+                    delete_gcs_folder(gcs_file_uri)
+
+                    # Mark for successful cleanup in meta
+                    meta["gcs_uri"] = None
+                    with open(meta_path, "w") as f:
+                        json.dump(meta, f, indent=4)
+
+                except Exception as e:
+                    # Log error but don't fail the whole job if cleanup fails
+                    print(f"[Worker] WARNING: GCS cleanup failed (Success Path) for job {job_id}. Error: {e}")
+                    # Update status, but the job status remains 'done' as the reports were generated
+                    jobs_status[job_id]["cleanup_warning"] = f"GCS cleanup failed: {str(e)}"
+            
             # --- Mark job as done ---
             jobs_status[job_id]["status"] = "done"
             jobs_status[job_id]["report_excel"] = os.path.basename(report_excel_path)
@@ -388,12 +446,27 @@ def report_worker():
         except Exception as e:
             print(f"[Worker] Error: {e}")
             traceback.print_exc()
+            
+            # --- GCS Cleanup (Error Path) ---
+            # Attempt cleanup using URI from meta or jobs_status
+            cleanup_uri = meta.get("gcs_uri", [None])[0]
+            if not cleanup_uri and job_id in jobs_status:
+                 cleanup_uri = jobs_status[job_id].get("gcs_uri", [None])[0]
+
+            if cleanup_uri:
+                try:
+                    print(f"[Worker] Starting GCS cleanup (Error Path) for {cleanup_uri}...")
+                    delete_gcs_folder(cleanup_uri)
+                except Exception as cleanup_e:
+                    print(f"[Worker] WARNING: GCS cleanup failed (Error Path) for job {job_id}: {cleanup_e}")
+
             # ✅ FIX: Check if job_id is still in jobs_status before accessing
             if job_id in jobs_status:
                 jobs_status[job_id]["status"] = "error"
                 jobs_status[job_id]["error"] = str(e)
                 write_job_statuses(jobs_status)
             job_handled = True # Job handled with an error
+            
         finally:
             # ✅ FIX: Only call task_done once at the end of the job processing
             if job_handled:

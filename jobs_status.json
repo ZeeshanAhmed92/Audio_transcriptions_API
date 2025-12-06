@@ -36,7 +36,7 @@
         "report_html": "Osman Goni 2_evaluation_report.html",
         "report_summary_html": "Osman Goni 2_summary.html"
     },
-    "c80ca767-76cd-4891-917e-842054fe40c0": {
+    "d5f17924-3f1f-4922-9f44-47519490f64e": {
         "status": "done",
         "file": "Osman Goni 6.m4a",
         "job_folder": "reports/job_1",
@@ -44,36 +44,12 @@
         "report_html": "Osman Goni 6_evaluation_report.html",
         "report_summary_html": "Osman Goni 6_summary.html"
     },
-    "078680d1-6498-486c-9130-20a4d1203aec": {
-        "status": "cancelling",
-        "file": "Osman Goni 6.m4a",
-        "job_folder": "reports/job_1"
-    },
-    "af36eef5-bae0-47eb-b827-f0387d79c959": {
+    "19faa436-c24f-4717-a2db-616cf9cb9246": {
         "status": "done",
-        "job_id": "af36eef5-bae0-47eb-b827-f0387d79c959",
-        "file": "Osman Goni 6.m4a",
+        "file": "Osman Goni 7.m4a",
         "job_folder": "reports/job_1",
-        "report_excel": "Osman Goni 6_evaluation_report.xlsx",
-        "report_html": "Osman Goni 6_evaluation_report.html",
-        "report_summary_html": "Osman Goni 6_summary.html"
-    },
-    "a33fdfae-db56-4500-9bde-11af41248683": {
-        "status": "done",
-        "job_id": "a33fdfae-db56-4500-9bde-11af41248683",
-        "file": "Osman Goni 6.m4a",
-        "job_folder": "reports/job_1",
-        "report_excel": "Osman Goni 6_evaluation_report.xlsx",
-        "report_html": "Osman Goni 6_evaluation_report.html",
-        "report_summary_html": "Osman Goni 6_summary.html"
-    },
-    "ed83096b-810c-47ae-9a37-b054dc959190": {
-        "status": "done",
-        "job_id": "ed83096b-810c-47ae-9a37-b054dc959190",
-        "file": "Osman Goni 6.m4a",
-        "job_folder": "reports/job_1",
-        "report_excel": "Osman Goni 6_evaluation_report.xlsx",
-        "report_html": "Osman Goni 6_evaluation_report.html",
-        "report_summary_html": "Osman Goni 6_summary.html"
+        "report_excel": "Osman Goni 7_evaluation_report.xlsx",
+        "report_html": "Osman Goni 7_evaluation_report.html",
+        "report_summary_html": "Osman Goni 7_summary.html"
     }
 }

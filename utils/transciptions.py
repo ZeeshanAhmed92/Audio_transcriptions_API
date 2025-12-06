@@ -18,78 +18,170 @@ AUDIO_EXTENSIONS = {"wav", "mp3", "aac", "ogg", "flac", "wma", "m4a"}
 
 
 def video_to_audio(input_file: str, output_file: str):
-    """Convert a single video file to WAV 16kHz mono using ffmpeg."""
+    """
+    Convert video to a small mono WAV at 16 kHz without increasing file size.
+    Uses PCM 16-bit WAV + highest compression.
+    """
     command = [
         "ffmpeg",
         "-i", input_file,
-        "-vn",                # disable video
-        "-acodec", "pcm_s16le",  # PCM WAV
-        "-ar", "16000",       # 16kHz sample rate
-        "-ac", "1",           # mono
-        output_file,
-        "-y"                  # overwrite if exists
-    ]
-    subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
-def audio_to_wav(input_file: str, output_file: str):
-    """Convert any audio file to WAV (16kHz mono) using ffmpeg."""
-    command = [
-        "ffmpeg",
-        "-i", input_file,
-        "-acodec", "pcm_s16le",  # PCM WAV
-        "-ar", "16000",       # 16kHz sample rate
-        "-ac", "1",           # mono
+        "-vn",
+        "-ac", "1",                 # mono
+        "-ar", "16000",            # 16 kHz (best for ASR)
+        "-sample_fmt", "s16",      # 16-bit PCM
+        "-compression_level", "12",# highest WAV compression
         output_file,
         "-y"
     ]
     subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def audio_to_wav(input_file: str, output_file: str):
+    """
+    Convert any audio file to small mono WAV for ASR without increasing size.
+    """
+    command = [
+        "ffmpeg",
+        "-i", input_file,
+        "-ac", "1",                 # mono
+        "-ar", "16000",            # 16 kHz ASR standard
+        "-sample_fmt", "s16",
+        "-compression_level", "12",
+        output_file,
+        "-y"
+    ]
+    subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+
 def split_audio(file_path: str, chunk_length_ms: int = 5 * 60 * 1000, target_formats=None):
     """
-    Split a WAV/MP3 file into chunks and export them in one or more formats (wav, mp3).
+    Split audio into chunks with size-efficient settings:
+    - Mono (1 channel)
+    - 16 kHz sample rate
+    - 16-bit PCM WAV with compression level 12 (smallest lossless WAV)
+    
+    Does NOT increase file size if input is already low bitrate or mono.
     """
+
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     ext = os.path.splitext(file_path)[1].replace('.', '').lower()
 
-    if ext not in ("wav", "mp3"):
-        raise ValueError(f"split_audio() expects .wav or .mp3 as input, got: {ext}")
+    if ext not in ("wav", "mp3", "aac", "m4a", "flac", "ogg"):
+        raise ValueError(f"Unsupported format for split_audio(): {ext}")
 
     if target_formats is None:
         target_formats = ["wav"]
 
-    audio = AudioSegment.from_file(file_path, format=ext)
+    # Load file (pydub auto-detects best decoder)
+    audio = AudioSegment.from_file(file_path)
     audio_length = len(audio)
     result = {}
 
+    # Normalize audio BEFORE splitting (mono + 16 kHz)
+    audio = audio.set_channels(1)           # mono
+    audio = audio.set_frame_rate(16000)     # 16 kHz
+
+    # Ensure 16-bit PCM WAV-friendly conversion
+    audio = audio.set_sample_width(2)       # 16-bit
+
     for fmt in target_formats:
         if fmt not in ("wav", "mp3"):
-            raise ValueError("target_formats can contain only 'wav' or 'mp3'")
+            raise ValueError("target_formats must be 'wav' or 'mp3'")
 
         chunks_dir = os.path.join(os.path.dirname(file_path), f"chunks_{fmt}")
         os.makedirs(chunks_dir, exist_ok=True)
 
+        # If whole audio < chunk size → export directly
         if audio_length <= chunk_length_ms:
             out_path = os.path.join(chunks_dir, f"{base_name}.{fmt}")
-            audio.export(out_path, format=fmt)
+
+            if fmt == "wav":
+                audio.export(out_path, format="wav", parameters=["-compression_level", "12"])
+            else:
+                audio.export(out_path, format="mp3", bitrate="48k")  # safe minimal mp3
+
             result[fmt] = [out_path]
             continue
 
+        # Otherwise split into chunks
         paths = []
         for i in range(0, audio_length, chunk_length_ms):
             chunk = audio[i:i + chunk_length_ms]
             name = f"{base_name}_part{i // chunk_length_ms + 1}.{fmt}"
             path = os.path.join(chunks_dir, name)
-            chunk.export(path, format=fmt)
+
+            if fmt == "wav":
+                chunk.export(path, format="wav",
+                             parameters=["-compression_level", "12"])
+            else:
+                chunk.export(path, format="mp3", bitrate="48k")
+
             paths.append(path)
+
         result[fmt] = paths
 
     return result
 
+
+def delete_gcs_folder(gcs_uri: str):
+    """
+    Deletes all files (blobs) in a GCS bucket that match the folder prefix
+    derived from the first GCS URI of a set of uploaded chunks.
+
+    Args:
+        gcs_uri: The full gs:// URI of *any* chunk file that was uploaded.
+    """
+    if not gcs_uri.startswith("gs://"):
+        raise ValueError("Invalid GCS URI format. Must start with 'gs://'")
+
+    print(f"Attempting GCS cleanup derived from URI: {gcs_uri}")
+
+    # 1. Parse URI to get bucket name and the path
+    path_without_scheme = gcs_uri[5:]
+    
+    try:
+        bucket_name, full_path = path_without_scheme.split("/", 1)
+    except ValueError:
+        print(f"Error: URI '{gcs_uri}' does not contain a full path. Skipping cleanup.")
+        return
+
+    # 2. Get the parent directory path (e.g., 'Interview_audios/Minarul Islam.m4a')
+    # We use os.path.dirname, which is safe for POSIX-style cloud paths.
+    folder_prefix_to_delete = os.path.dirname(full_path)
+    
+    # Ensure the prefix ends with a slash for listing all contents of the folder
+    if folder_prefix_to_delete and not folder_prefix_to_delete.endswith('/'):
+        folder_prefix_to_delete += '/'
+
+    print(f"Deleting all files under prefix: '{folder_prefix_to_delete}' in bucket: '{bucket_name}'")
+
+    if not folder_prefix_to_delete:
+         print("Warning: Calculated prefix is empty, skipping deletion to prevent deleting the whole bucket.")
+         return
+         
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+
+        # List all blobs with the calculated folder prefix
+        blobs = bucket.list_blobs(prefix=folder_prefix_to_delete)
+        
+        deleted_count = 0
+        
+        for blob in blobs:
+            blob.delete()
+            deleted_count += 1
+            
+        print(f"Successfully deleted {deleted_count} file(s) from GCS for folder prefix: {folder_prefix_to_delete}")
+        
+    except Exception as e:
+        print(f"Error during GCS cleanup: {e}")
+        # Allow the process to continue even if cleanup fails
+        return
 
 def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name: str) -> str:
     if not os.path.exists(source_file_path):
@@ -105,13 +197,13 @@ def upload_to_gcs(bucket_name: str, source_file_path: str, destination_blob_name
     return gcs_uri
 
 
-def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, target_formats=None) -> list:
+def split_and_upload(bucket_name: str, source_file_path: str, gcs_path_prefix: str, target_formats=None) -> list:
     """
-    Handles both video and audio input:
-    - If video (.mp4, .mkv, etc.) → convert to wav (16kHz mono).
-    - If audio but not .wav/.mp3 → convert to wav.
-    - If already .wav or .mp3 → use directly.
-    - Splits into chunks and uploads each to GCS.
+    Main workflow:
+    1. Detects file type.
+    2. Converts Video or non-standard Audio -> standard WAV.
+    3. Splits file.
+    4. Uploads to GCS.
     """
     base_name = os.path.splitext(os.path.basename(source_file_path))[0]
     ext = os.path.splitext(source_file_path)[1].replace('.', '').lower()
@@ -119,18 +211,19 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
     # Convert video to wav
     if ext in VIDEO_EXTENSIONS:
         converted_path = os.path.join(os.path.dirname(source_file_path), f"{base_name}.wav")
+        # Only convert if the wav doesn't already exist (optional optimization)
         video_to_audio(source_file_path, converted_path)
         source_file_path = converted_path
 
-    # Convert unsupported audio to wav
+    # Convert unsupported audio to wav (if it's not already wav/mp3)
     elif ext in AUDIO_EXTENSIONS and ext not in ("wav", "mp3"):
         converted_path = os.path.join(os.path.dirname(source_file_path), f"{base_name}.wav")
         audio_to_wav(source_file_path, converted_path)
         source_file_path = converted_path
 
-    elif ext not in ("wav", "mp3"):
+    elif ext not in ("wav", "mp3") and ext not in VIDEO_EXTENSIONS:
         raise ValueError(f"Unsupported file type: {ext}")
-
+    
     # Split audio into chunks
     chunk_dict = split_audio(source_file_path, target_formats=target_formats)
     gcs_uris = []
@@ -139,7 +232,8 @@ def split_and_upload(bucket_name: str, source_file_path: str, gcs_folder: str, t
     for _, chunk_files in chunk_dict.items():
         for chunk_file in chunk_files:
             chunk_name = os.path.basename(chunk_file)
-            gcs_path = f"{gcs_folder}/{chunk_name}"
+            # CORRECTED: Use the full prefix (e.g., Interview_audios/Minarul Islam.m4a)
+            gcs_path = f"{gcs_path_prefix}/{chunk_name}"
             uri = upload_to_gcs(bucket_name, chunk_file, gcs_path)
             gcs_uris.append(uri)
 
